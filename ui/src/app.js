@@ -1116,16 +1116,33 @@
         }
         const ocr = await compressImage(file, 1400, 0.8);
         const r = await T.recognize(ocr.ocrUrl || ocr.dataUrl, 'chi_sim+eng');
-        const lines = (r.data.text || '').split(/\n+/)
-          .map((s) => s.replace(/\s+/g, ' ').trim())
-          .filter((s) => s.length >= 3);
-        if (!lines.length) {
-          $('ics-result').textContent = '⚠️ 图片中未识别出文字（照片要清晰、课表文字方向要正）';
-          return;
+        // 优先按「节次 × 星期」网格课表解析（教务系统截图/照片），失败再按文字行解析
+        let drafts = [];
+        let skippedNote = '';
+        const gridWords = (r.data.words || [])
+          .filter((w) => w && w.bbox)
+          .map((w) => ({ text: w.text || '', x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 }));
+        if (window.Timetable.parseTimetableGrid && gridWords.length >= 8) {
+          const g = window.Timetable.parseTimetableGrid(gridWords);
+          if (g.drafts.length) {
+            drafts = g.drafts;
+            if (g.skipped > 0) skippedNote = `，${g.skipped} 格无法识别已跳过`;
+          }
         }
-        const { drafts, skipped } = window.Timetable.parseTimetableLines(lines);
         if (!drafts.length) {
-          $('ics-result').textContent = '⚠️ 识别到 ' + lines.length + ' 行文字，但没有「课名 + 周X + 时间/节次」格式的课程行——可手动添加，每行示例：高等数学 周一 08:00-09:40';
+          const lines = (r.data.text || '').split(/\n+/)
+            .map((s) => s.replace(/\s+/g, ' ').trim())
+            .filter((s) => s.length >= 3);
+          if (!lines.length) {
+            $('ics-result').textContent = '⚠️ 图片中未识别出文字（照片要清晰、课表文字方向要正）';
+            return;
+          }
+          const parsed = window.Timetable.parseTimetableLines(lines);
+          drafts = parsed.drafts;
+          if (parsed.skipped.length) skippedNote = `，${parsed.skipped.length} 行无法识别已跳过`;
+        }
+        if (!drafts.length) {
+          $('ics-result').textContent = '⚠️ 识别到文字，但没有解析出课程——支持两种课表：① 教务系统「节次×星期」网格表截图；② 文字行（每行示例：高等数学 周一 08:00-09:40）';
           return;
         }
         // 去重：同名同时段不重复导入
@@ -1140,8 +1157,8 @@
         }
         $('ics-result').textContent = `✓ 已从课表图片导入 ${added} 门课`
           + (added < drafts.length ? `（${drafts.length - added} 门已存在跳过）` : '')
-          + (skipped.length ? `，${skipped.length} 行无法识别已跳过` : '')
-          + '。每门课悬停后点 ✏️ 可修改';
+          + skippedNote
+          + '。时间按默认作息表估算，每门课悬停后点 ✏️ 可修改';
         renderEvents();
         reschedule();
       } catch (e) {
