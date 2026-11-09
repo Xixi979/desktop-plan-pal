@@ -230,6 +230,14 @@ export class PlanStore {
     const before = this.tasks.get(id);
     if (!before) throw new Error(`task not found: ${id}`);
     const after: Task = { ...before, ...patch };
+    // 达标规则（业务层强制，UI/同步/手机端一致生效）：
+    // 有达标清单且全部勾完 → 自动完成；取消任一勾选 → 自动回退为已排布
+    const ck = after.checklist;
+    if (ck && ck.length > 0) {
+      const allDone = ck.every((c) => c.done);
+      if (allDone && after.status !== 'done' && after.status !== 'cancelled') after.status = 'done';
+      if (!allDone && after.status === 'done') after.status = 'scheduled';
+    }
     await this.commit('task', id, 'update', { before, after });
     return after;
   }

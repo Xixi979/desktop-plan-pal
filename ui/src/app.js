@@ -1,4 +1,5 @@
-/* 桌面计划小人 v0.1 界面逻辑（纯 JS，无依赖） */
+/* 桌面计划小人 v0.1 界面逻辑（纯 JS，无依赖）
+ * v0.1.5 新增：多通道录入（一句话/图片/链接）、达标清单（逐条打勾）、计划关联文件夹 */
 (function () {
   'use strict';
   const Engine = window.Engine;
@@ -13,6 +14,12 @@
   function nowMinutes() {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
+  }
+  /** HTML 转义：所有用户输入内容插入 DOM 前必须经过这里 */
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
   // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致）----
@@ -98,6 +105,163 @@
     };
   }
 
+  // ---- 链接识别（本地规则版）----
+  const SITE_MAP = [
+    [/bilibili\.com|b23\.tv/, 'B站视频', '学习'],
+    [/github\.com/, 'GitHub 仓库', '学习'],
+    [/docs\.qq\.com/, '腾讯文档', '报告'],
+    [/mp\.weixin\.qq\.com/, '微信公众号文章', '阅读'],
+    [/zhihu\.com/, '知乎', '阅读'],
+    ['icourse163.org', '慕课网课', '学习'],
+    ['xuetangx.com', '学堂在线', '学习'],
+    ['chaoxing.com', '超星学习通', '学习'],
+    ['arxiv.org', 'arXiv 论文', '学习'],
+    ['cnki.net', '知网文献', '学习'],
+    ['edu.cn', '教务/学校页面', '其他'],
+  ];
+  function parseLink(raw) {
+    let u;
+    try { u = new URL(/^https?:\/\//i.test(raw) ? raw.trim() : 'https://' + raw.trim()); }
+    catch (e) { return null; }
+    let site = '网页', cat = '学习';
+    for (const [pat, name, c] of SITE_MAP) {
+      const hit = pat instanceof RegExp ? pat.test(u.hostname) : u.hostname.includes(pat);
+      if (hit) { site = name; cat = c; break; }
+    }
+    // 标题建议：取路径最后一段有意义的内容（支持中文 slug）
+    let slug = '';
+    const segs = u.pathname.split('/').filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const s = decodeURIComponent(segs[i]);
+      if (/[\u4e00-\u9fa5A-Za-z]{2,}/.test(s) && !/^(index|html?|main)$/i.test(s)) { slug = s; break; }
+    }
+    if (!slug && u.searchParams.get('title')) slug = u.searchParams.get('title');
+    const title = slug ? `${site}：${slug}` : site;
+    return { url: u.href, site, title, category: cat };
+  }
+
+  // ---- 图片录入（本地规则版：压缩预览 + 文件名/备注识别；OCR 在 v0.2 接入）----
+  function compressImage(file, maxW = 640) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+      img.src = url;
+    });
+  }
+  let pendingImage = null; // { dataUrl, name }
+  async function acceptImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const dataUrl = await compressImage(file);
+      pendingImage = { dataUrl, name: file.name.replace(/\.[a-z0-9]+$/i, '') };
+      $('img-thumb').src = dataUrl;
+      $('img-title').value = pendingImage.name || '';
+      $('img-confirm').classList.remove('hidden');
+    } catch (e) { alert(e.message); }
+  }
+  function addImageTask() {
+    if (!pendingImage) return;
+    const note = $('img-note').value.trim();
+    const parsed = note ? parseQuick(note) : null;
+    const minutes = parseInt($('img-min').value, 10) || (parsed ? parsed.estimatedMinutes : 60);
+    store.addTask({
+      title: $('img-title').value.trim() || '图片计划',
+      category: parsed ? parsed.category : '其他',
+      estimatedMinutes: minutes,
+      priority: parsed ? parsed.priority : 3,
+      splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
+      deadline: parsed ? parsed.deadline : null,
+      source: 'image',
+      imageUrl: pendingImage.dataUrl,
+      folderPath: null, checklist: [],
+    }).then(() => {
+      pendingImage = null;
+      $('img-note').value = '';
+      $('img-confirm').classList.add('hidden');
+      $('img-thumb').src = '';
+      $('img-file').value = '';
+      renderTasks(); reschedule();
+    });
+  }
+
+  let pendingLink = null;
+  function parseLinkInput() {
+    const r = parseLink($('link-input').value);
+    if (!r) { $('link-preview').textContent = '⚠️ 无法识别该链接，请检查格式'; return; }
+    pendingLink = r;
+    $('link-preview').textContent = `→ 识别为「${r.site}」 建议类别：${r.category}`;
+    $('link-title').value = r.title;
+    $('link-cat').value = r.category;
+    $('link-confirm').classList.remove('hidden');
+  }
+  function addLinkTask() {
+    if (!pendingLink) return;
+    const minutes = parseInt($('link-min').value, 10) || 60;
+    store.addTask({
+      title: $('link-title').value.trim() || pendingLink.site,
+      category: $('link-cat').value.trim() || pendingLink.category,
+      estimatedMinutes: minutes,
+      priority: 3, splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
+      deadline: null,
+      source: 'link', linkUrl: pendingLink.url,
+      folderPath: null, checklist: [],
+    }).then(() => {
+      pendingLink = null;
+      $('link-input').value = '';
+      $('link-preview').textContent = '';
+      $('link-confirm').classList.add('hidden');
+      renderTasks(); reschedule();
+    });
+  }
+
+  // ---- 达标清单 ----
+  const ckId = () => 'ck-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  function ckStats(t) {
+    const list = t.checklist || [];
+    return { total: list.length, done: list.filter((c) => c.done).length };
+  }
+  async function addCheckItem(tid, text) {
+    const t = store.getTask(tid);
+    if (!t || !text.trim()) return;
+    const list = [...(t.checklist || []), { id: ckId(), text: text.trim(), done: false }];
+    await store.updateTask(tid, { checklist: list });
+    renderTasks();
+  }
+  async function toggleCheck(tid, ckid, checked) {
+    const t = store.getTask(tid);
+    if (!t) return;
+    const wasDone = t.status === 'done';
+    const list = (t.checklist || []).map((c) => c.id === ckid
+      ? { ...c, done: checked, doneAt: checked ? new Date().toISOString() : undefined } : c);
+    await store.updateTask(tid, { checklist: list }); // 达标自动完成/回退规则在数据层统一生效
+    const nowDone = store.getTask(tid)?.status === 'done';
+    renderTasks();
+    if (wasDone !== nowDone) reschedule(); // 完成状态变化后腾出/释放时间，重排剩余计划
+  }
+
+  // ---- 文件夹 ----
+  async function saveFolder(tid) {
+    const input = document.querySelector(`input[data-folder="${tid}"]`);
+    if (!input) return;
+    await store.updateTask(tid, { folderPath: input.value.trim() || undefined });
+    renderTasks();
+  }
+  async function copyFolder(tid) {
+    const t = store.getTask(tid);
+    if (!t || !t.folderPath) return;
+    try { await navigator.clipboard.writeText(t.folderPath); } catch (e) { /* 忽略 */ }
+  }
+
   // ---- 排程 ----
   function reschedule() {
     const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
@@ -115,7 +279,7 @@
 
   function renderWarnings(list) {
     $('warnings').innerHTML = (list || []).map((w) =>
-      `<div class="warning">⚠️ ${w.message}</div>`).join('');
+      `<div class="warning">⚠️ ${esc(w.message)}</div>`).join('');
   }
 
   // ---- 时间轴渲染（07:00-24:00）----
@@ -139,8 +303,8 @@
       if (em <= dayStart || sm >= dayEnd) continue;
       const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
       const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
-      html += `<div class="block fixed" style="top:${top}px;height:${h}px" title="${ev.title}">
-        <span class="b-title">🔒 ${ev.title}</span></div>`;
+      html += `<div class="block fixed" style="top:${top}px;height:${h}px" title="${esc(ev.title)}">
+        <span class="b-title">🔒 ${esc(ev.title)}</span></div>`;
     }
     for (const b of blocks) {
       const sm = Engine.toMin(b.start) && new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes();
@@ -151,8 +315,8 @@
       const color = b.type === 'break' ? '#86efac' : (task ? colorOf(task.category) : '#b0b7c3');
       const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
       const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
-      html += `<div class="block ${b.type}" style="top:${top}px;height:${h - 2}px;background:${color}" title="${label}">
-        <span class="b-title">${label} · ${b.start.slice(11)}-${b.end.slice(11)}</span></div>`;
+      html += `<div class="block ${b.type}" style="top:${top}px;height:${h - 2}px;background:${color}" title="${esc(label)}">
+        <span class="b-title">${esc(label)} · ${b.start.slice(11)}-${b.end.slice(11)}</span></div>`;
     }
     const nm = nowMinutes();
     if (nm > dayStart && nm < dayEnd) {
@@ -162,26 +326,61 @@
     $('today-label').textContent = `（${day} 周${'日一二三四五六'[new Date().getDay()]}）`;
   }
 
-  // ---- 任务 / 事件列表 ----
+  // ---- 任务列表（含达标清单 + 文件夹 + 附件详情）----
   function renderTasks() {
     const tasks = store.listTasks();
-    $('task-list').innerHTML = tasks.map((t) => `
+    $('task-list').innerHTML = tasks.map((t) => {
+      const ck = ckStats(t);
+      const badges = [
+        t.source === 'image' && t.imageUrl ? '<span class="badge" title="来自图片录入">🖼️</span>' : '',
+        t.source === 'link' && t.linkUrl ? '<span class="badge" title="来自链接录入">🔗</span>' : '',
+        t.folderPath ? '<span class="badge" title="已关联资料文件夹">📁</span>' : '',
+        ck.total ? `<span class="badge ck-badge" title="达标进度">${ck.done}/${ck.total}</span>` : '',
+      ].join('');
+      const ckHtml = (t.checklist || []).map((c) => `
+        <label class="ck-item ${c.done ? 'ck-done' : ''}">
+          <input type="checkbox" data-act="ck-toggle" data-tid="${t.id}" data-ckid="${c.id}" ${c.done ? 'checked' : ''}>
+          <span>${esc(c.text)}</span>
+        </label>`).join('');
+      return `
       <li class="${t.status === 'done' ? 'done' : ''}">
-        <span class="dot" style="background:${colorOf(t.category)}"></span>
-        <b>${t.title}</b>
-        <span class="meta">${t.category} · ${t.estimatedMinutes}分钟 · 优先级${t.priority}${t.deadline ? ' · DDL ' + t.deadline.replace('T', ' ') : ''}</span>
-        <span class="ops">
-          <button data-act="done" data-id="${t.id}" title="完成">✔</button>
-          <button data-act="del" data-id="${t.id}" title="删除">✕</button>
-        </span>
-      </li>`).join('') || '<li class="empty">还没有计划，用上面的一句话输入试试～</li>';
+        <div class="t-main">
+          <span class="dot" style="background:${colorOf(t.category)}"></span>
+          <b>${esc(t.title)}</b>${badges}
+          <span class="meta">${esc(t.category)} · ${t.estimatedMinutes}分钟 · 优先级${t.priority}${t.deadline ? ' · DDL ' + esc(t.deadline.replace('T', ' ')) : ''}</span>
+          <span class="ops">
+            <button data-act="done" data-id="${t.id}" title="完成">✔</button>
+            <button data-act="del" data-id="${t.id}" title="删除">✕</button>
+          </span>
+        </div>
+        <details class="t-detail">
+          <summary>达标要求 & 资料</summary>
+          <div class="ck-box">
+            ${ckHtml || '<p class="hint">还没有达标要求，添加后逐条打勾，全部完成即自动达标 ✔</p>'}
+            <div class="row ck-add-row">
+              <input data-ck-input="${t.id}" placeholder="添加达标要求，如：完成第3章习题并自查" style="flex:1;min-width:180px">
+              <button data-act="ck-add" data-id="${t.id}">➕ 加一条</button>
+            </div>
+          </div>
+          <div class="folder-box row">
+            <span title="该任务产出的文件统一放这里">📁</span>
+            <input data-folder="${t.id}" placeholder="资料文件夹路径，如 C:\\Users\\你\\Desktop\\高数作业" value="${esc(t.folderPath || '')}" style="flex:1;min-width:180px">
+            <button data-act="folder-save" data-id="${t.id}" title="保存路径">保存</button>
+            <button data-act="folder-copy" data-id="${t.id}" title="复制路径">📋</button>
+            ${window.__TAURI__ ? `<button data-act="folder-open" data-id="${t.id}" title="打开文件夹">📂</button>` : ''}
+          </div>
+          ${t.imageUrl ? `<div class="attach-box"><img src="${t.imageUrl}" alt="附件图片" class="attach-img"></div>` : ''}
+          ${t.linkUrl ? `<div class="attach-box">🔗 <a href="${esc(t.linkUrl)}" target="_blank" rel="noopener">${esc(t.linkUrl)}</a></div>` : ''}
+        </details>
+      </li>`;
+    }).join('') || '<li class="empty">还没有计划，试试上方三种录入方式：一句话 / 图片 / 链接～</li>';
   }
 
   function renderEvents() {
     const evs = store.listFixedEvents();
     $('evt-list').innerHTML = evs.map((e) => `
       <li><span class="dot" style="background:#94a3b8"></span>
-        <b>${e.title}</b>
+        <b>${esc(e.title)}</b>
         <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? '按周重复' : '仅一次'}</span>
         <span class="ops"><button data-act="delevt" data-id="${e.id}" title="删除">✕</button></span>
       </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
@@ -203,6 +402,10 @@
       if (current.type === 'break') {
         pet.firstChild.textContent = '🍵';
         bubble.textContent = `休息中，还剩 ${end - nm} 分钟～`;
+      } else if (task && task.checklist && task.checklist.length) {
+        const ck = ckStats(task);
+        pet.firstChild.textContent = '🧑‍💻';
+        bubble.textContent = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
       } else {
         pet.firstChild.textContent = '🧑‍💻';
         bubble.textContent = `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`;
@@ -219,30 +422,89 @@
   }
 
   // ---- 事件绑定 ----
+  function bindTabs() {
+    $('entry-tabs').onclick = (ev) => {
+      const tab = ev.target.closest('.tab');
+      if (!tab) return;
+      for (const b of $('entry-tabs').querySelectorAll('.tab')) b.classList.toggle('active', b === tab);
+      for (const pane of document.querySelectorAll('#panel-quick .tabpane')) {
+        pane.classList.toggle('hidden', pane.id !== 'pane-' + tab.dataset.tab);
+      }
+    };
+  }
+
   function bind() {
+    bindTabs();
+    // 通道一：一句话
     $('quick-add').onclick = async () => {
       const parsed = parseQuick($('quick-input').value);
       $('quick-preview').textContent = `→ 「${parsed.title}」 ${parsed.category} ${parsed.estimatedMinutes}分钟 优先级${parsed.priority}${parsed.deadline ? ' DDL ' + parsed.deadline.replace('T', ' ') : ''}`;
-      await store.addTask(parsed);
+      await store.addTask({ ...parsed, source: 'text', folderPath: null, checklist: [] });
       $('quick-input').value = '';
       renderTasks();
       reschedule();
     };
-    $('task-add').onclick = async () => {
-      const title = $('task-title').value.trim();
-      if (!title) return;
-      await store.addTask({
-        title,
-        category: $('task-cat').value.trim() || '其他',
-        estimatedMinutes: parseInt($('task-min').value, 10) || 60,
-        priority: parseInt($('task-pri').value, 10) || 3,
-        splittable: (parseInt($('task-min').value, 10) || 60) >= 50,
-        minBlockMinutes: 25,
-        deadline: $('task-ddl').value || null,
-      });
-      $('task-title').value = '';
+    // 通道二：图片
+    $('img-drop').onclick = () => $('img-file').click();
+    $('img-file').onchange = () => acceptImageFile($('img-file').files[0]);
+    $('img-drop').ondragover = (e) => { e.preventDefault(); $('img-drop').classList.add('dragging'); };
+    $('img-drop').ondragleave = () => $('img-drop').classList.remove('dragging');
+    $('img-drop').ondrop = (e) => {
+      e.preventDefault();
+      $('img-drop').classList.remove('dragging');
+      acceptImageFile(e.dataTransfer.files[0]);
+    };
+    // Ctrl+V 直接粘贴截图
+    document.addEventListener('paste', (e) => {
+      if (!$('pane-image') || $('pane-image').classList.contains('hidden')) return;
+      const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+      if (item) acceptImageFile(item.getAsFile());
+    });
+    $('img-add').onclick = addImageTask;
+    // 通道三：链接
+    $('link-parse').onclick = parseLinkInput;
+    $('link-input').onkeydown = (e) => { if (e.key === 'Enter') parseLinkInput(); };
+    $('link-add').onclick = addLinkTask;
+
+    // 计划列表：按钮点击 + 勾选 + 回车加达标项
+    $('task-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (btn.dataset.act === 'done') {
+        const t = store.getTask(id);
+        const ck = ckStats(t);
+        if (ck.total > 0 && ck.done < ck.total &&
+            !confirm(`「${t.title}」还有 ${ck.total - ck.done} 项达标要求未完成，确定直接标记完成？`)) return;
+        await store.updateTask(id, { status: 'done' });
+      } else if (btn.dataset.act === 'del') {
+        await store.deleteTask(id);
+      } else if (btn.dataset.act === 'ck-add') {
+        const input = document.querySelector(`input[data-ck-input="${id}"]`);
+        if (input) { await addCheckItem(id, input.value); }
+        return; // addCheckItem 内部已渲染
+      } else if (btn.dataset.act === 'folder-save') {
+        await saveFolder(id);
+        return;
+      } else if (btn.dataset.act === 'folder-copy') {
+        await copyFolder(id);
+        return;
+      } else if (btn.dataset.act === 'folder-open') {
+        // Tauri 桌面端：调用 rust 侧 open_folder 命令（v0.2 接入）；浏览器端降级为复制
+        await copyFolder(id);
+        return;
+      }
       renderTasks();
       reschedule();
+    };
+    $('task-list').onchange = (ev) => {
+      const cb = ev.target.closest('input[data-act="ck-toggle"]');
+      if (!cb) return;
+      toggleCheck(cb.dataset.tid, cb.dataset.ckid, cb.checked);
+    };
+    $('task-list').onkeydown = (ev) => {
+      const input = ev.target.closest('input[data-ck-input]');
+      if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
     };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
@@ -289,25 +551,6 @@
       localStorage.removeItem('plan-pal.snap');
       localStorage.removeItem('plan-pal.blocks');
       location.reload();
-    };
-    $('task-list').onclick = async (ev) => {
-      const btn = ev.target.closest('button');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      if (btn.dataset.act === 'done') {
-        await store.updateTask(id, { status: 'done' });
-      } else if (btn.dataset.act === 'del') {
-        await store.deleteTask(id);
-      }
-      renderTasks();
-      reschedule();
-    };
-    $('evt-list').onclick = async (ev) => {
-      const btn = ev.target.closest('button');
-      if (!btn || btn.dataset.act !== 'delevt') return;
-      await store.removeFixedEvent(btn.dataset.id);
-      renderEvents();
-      reschedule();
     };
     // 强度参数：修改即保存并重排
     const paramIds = [['p-load', 'dailyLoadCapMinutes'], ['p-bmax', 'blockMaxMinutes'],

@@ -60,12 +60,50 @@ ${css}
 </header>
 <main>
   <section class="panel" id="panel-quick">
-    <h2>⚡ 一句话加计划</h2>
-    <div class="row">
-      <input id="quick-input" placeholder="例如：写实验报告 3小时 周五前（自动识别时长/DDL/类别）">
-      <button id="quick-add">添加</button>
+    <h2>⚡ 加计划</h2>
+    <div class="tabs" id="entry-tabs">
+      <button class="tab active" data-tab="text">⌨️ 一句话</button>
+      <button class="tab" data-tab="image">🖼️ 图片</button>
+      <button class="tab" data-tab="link">🔗 链接</button>
     </div>
-    <div id="quick-preview" class="preview"></div>
+    <div class="tabpane" id="pane-text">
+      <div class="row">
+        <input id="quick-input" placeholder="例如：写实验报告 3小时 周五前（自动识别时长/DDL/类别）">
+        <button id="quick-add">添加</button>
+      </div>
+      <div id="quick-preview" class="preview"></div>
+    </div>
+    <div class="tabpane hidden" id="pane-image">
+      <div id="img-drop">点击选择 / 拖入图片 / Ctrl+V 粘贴截图（如课程表、作业要求）</div>
+      <input id="img-file" type="file" accept="image/*" hidden>
+      <div id="img-confirm" class="hidden">
+        <div class="img-prev-wrap"><img id="img-thumb" alt="图片预览"></div>
+        <div class="row form">
+          <input id="img-title" placeholder="标题（默认取文件名）" style="flex:1;min-width:160px">
+          <input id="img-min" type="number" value="60" title="预计分钟" style="max-width:80px">
+          <input id="img-note" placeholder="备注，可识别时长/DDL，如：复习第3章 2小时 周五前" style="flex:1;min-width:160px">
+          <button id="img-add">添加计划</button>
+        </div>
+      </div>
+      <p class="hint">当前为本地规则版：自动取文件名 + 备注识别时长/DDL；图片内文字 OCR 识别将在 v0.2 接入。</p>
+    </div>
+    <div class="tabpane hidden" id="pane-link">
+      <div class="row">
+        <input id="link-input" placeholder="粘贴链接：B站视频 / GitHub 仓库 / 在线文档 / 网课页面…" style="flex:1;min-width:220px">
+        <button id="link-parse">识别</button>
+      </div>
+      <div id="link-confirm" class="hidden">
+        <div class="row form">
+          <input id="link-title" placeholder="标题" style="flex:1;min-width:160px">
+          <input id="link-cat" placeholder="类别" value="学习" style="max-width:90px">
+          <input id="link-min" type="number" value="60" title="预计分钟" style="max-width:80px">
+          <input id="link-url-show" hidden>
+          <button id="link-add">添加计划</button>
+        </div>
+      </div>
+      <div id="link-preview" class="preview"></div>
+      <p class="hint">当前为本地规则识别（站点/标题建议）；联网抓取网页标题将在 v0.2 接入 LLM 双路由。</p>
+    </div>
   </section>
   <section class="panel">
     <h2>📝 计划列表</h2>

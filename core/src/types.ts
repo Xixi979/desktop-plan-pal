@@ -9,6 +9,17 @@
 /** 计划状态机：草稿 → 已排布 → 进行中 → 完成/超时顺延/取消 */
 export type TaskStatus = 'draft' | 'scheduled' | 'in_progress' | 'done' | 'deferred' | 'cancelled';
 
+/** 达标要求：一条可勾选的完成标准；全部勾完即任务达标（自动标记 done） */
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+  doneAt?: string;               // 勾选时间（复盘统计用）
+}
+
+/** 计划录入来源：一句话文本 / 图片识别 / 链接识别 / 手动表单 */
+export type TaskSource = 'text' | 'image' | 'link' | 'manual';
+
 /** 时间块类型 */
 export type BlockType = 'fixed' | 'flexible' | 'break' | 'buffer';
 
@@ -25,6 +36,12 @@ export interface Task {
   location?: string;             // 地点约束（如"图书馆"）
   dependsOn?: string[];          // 依赖的任务 id（须在其后）
   status: TaskStatus;
+  // ---- v0.1.5 新增：达标机制与多通道录入 ----
+  checklist?: ChecklistItem[];   // 达标要求列表（全部勾完 → 任务完成）
+  folderPath?: string;           // 关联资料文件夹：该任务产出的文件统一放这里（桌面端经 Tauri 打开/创建）
+  source?: TaskSource;           // 录入通道
+  imageUrl?: string;             // source=image 时保存的压缩预览（dataURL，≤640px）
+  linkUrl?: string;              // source=link 时保存的原始链接
 }
 
 /** 时间块：什么时候做（排程引擎产出；用户拖拽后加 locked 标记） */

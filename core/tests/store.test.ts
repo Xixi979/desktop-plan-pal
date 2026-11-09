@@ -40,6 +40,45 @@ describe('PlanStore 基本操作（MemoryAdapter）', () => {
     expect(store.listTasks()[0].id).toBe(t1.id);
   });
 
+  it('达标清单：逐条勾选，全部达标自动完成，取消一条自动回退', async () => {
+    const adapter = new MemoryAdapter();
+    const store = new PlanStore(adapter, 'dev-a');
+    await store.open();
+    const t = await store.addTask(mkTaskInput({
+      checklist: [
+        { id: 'ck1', text: '完成第3章习题', done: false },
+        { id: 'ck2', text: '对答案并订正', done: false },
+      ],
+      folderPath: 'C:/Desktop/高数作业',
+      source: 'text',
+    }));
+    expect(store.getTask(t.id)?.checklist).toHaveLength(2);
+    expect(store.getTask(t.id)?.folderPath).toBe('C:/Desktop/高数作业');
+    expect(store.getTask(t.id)?.source).toBe('text');
+
+    // 勾第一条 → 仍未完成
+    let list = store.getTask(t.id)!.checklist!.map((c) =>
+      c.id === 'ck1' ? { ...c, done: true, doneAt: '2026-11-09T10:00:00.000Z' } : c);
+    await store.updateTask(t.id, { checklist: list });
+    expect(store.getTask(t.id)?.status).not.toBe('done');
+
+    // 勾第二条 → 全部达标，自动 done
+    list = list.map((c) => (c.id === 'ck2' ? { ...c, done: true } : c));
+    await store.updateTask(t.id, { checklist: list });
+    expect(store.getTask(t.id)?.status).toBe('done');
+
+    // 取消一条 → 自动回退为未完成
+    list = list.map((c) => (c.id === 'ck2' ? { ...c, done: false } : c));
+    const reverted = await store.updateTask(t.id, { checklist: list, status: 'scheduled' });
+    expect(reverted.checklist!.every((c) => c.done)).toBe(false);
+
+    // 达标数据经日志重放后不丢失
+    const storeB = new PlanStore(adapter, 'dev-a');
+    await storeB.open();
+    expect(storeB.getTask(t.id)?.checklist?.[0].text).toBe('完成第3章习题');
+    expect(storeB.getTask(t.id)?.folderPath).toBe('C:/Desktop/高数作业');
+  });
+
   it('快照 + 日志重放：重新 open 后状态完整恢复', async () => {
     const adapter = new MemoryAdapter();
     const storeA = new PlanStore(adapter, 'dev-a');
