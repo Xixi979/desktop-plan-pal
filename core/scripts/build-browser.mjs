@@ -42,8 +42,9 @@ const icsJs = toBrowserJs('core/src/ics.ts', 'Ics', [
 ]);
 
 const appJs = read('ui/src/app.js');
+const petJs = read('ui/src/pet.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.1.11 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.2.0 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -51,7 +52,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>桌面计划小人 · v0.1</title>
+<title>桌面计划小人 · v0.2</title>
 <style>
 ${css}
 </style>
@@ -75,7 +76,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
     + '或安装最新版 Edge / Chrome。</p></div>');
 }
 </script>
-<div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
+<div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
   <h1>桌面计划小人 <span class="ver">${BUILD_TAG}</span></h1>
   <div class="header-actions">
@@ -215,6 +216,9 @@ ${checklistJs}
 ${icsJs}
 </script>
 <script>
+${petJs}
+</script>
+<script>
 ${appJs}
 </script>
 </body>
@@ -222,4 +226,15 @@ ${appJs}
 `;
 
 writeFileSync(join(root, 'ui', 'index.html'), html, 'utf8');
+
+// 自测页：index.html + 测试注入脚本（真实点击自测，无头 Edge 运行后检查 selftest-out）
+const selftestJs = read('ui/selftest.inject.js');
+const selftestHtml = html.replace(
+  '</body>',
+  '<div id="selftest-out" style="position:fixed;top:0;left:0;z-index:99999;background:#ff0;color:#000;font-size:10px;white-space:pre-wrap;max-width:100%">pending</div>\n<script>\n'
+    + selftestJs + '\n</script>\n</body>',
+);
+writeFileSync(join(root, 'ui', 'selftest.html'), selftestHtml, 'utf8');
+
 console.log(`✓ 已生成 ui/index.html（${(html.length / 1024).toFixed(1)} KB，自包含单文件）`);
+console.log(`✓ 已生成 ui/selftest.html（${(selftestHtml.length / 1024).toFixed(1)} KB，自测页）`);

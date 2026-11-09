@@ -168,3 +168,48 @@ button.mini { padding: 2px 10px; font-size: 12px; margin-left: 8px; vertical-ali
   max-width: 80vw;
 }
 #pp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---- v0.2：小人 Sprite + 状态机动画 ---- */
+#pet { transition: transform .3s; }
+#pet .pet-svg { display: block; }
+#pet.st-happy { animation: pet-jump .55s ease-in-out infinite; }
+#pet.st-idle .pet-body { animation: pet-breathe 2.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-body { animation: pet-bob .5s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-arm { animation: pet-type .35s ease-in-out infinite; }
+#pet.st-working .arm-l { animation-delay: .18s; transform-origin: 23px 65px; }
+#pet.st-working .arm-r { transform-origin: 97px 65px; }
+#pet.st-break .pet-body { animation: pet-sway 2.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-break .pet-steam { animation: pet-steam 1.8s linear infinite; opacity: 0; }
+#pet.st-tired .pet-body { animation: pet-wobble 3.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-tired .pet-sweat { animation: pet-sweat 1.6s ease-in infinite; opacity: 0; }
+#pet.st-sleeping .pet-body { animation: pet-breathe 3.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-sleeping .pet-z { animation: pet-zfloat 2.4s ease-out infinite; opacity: 0; }
+#pet.st-sleeping .z2 { animation-delay: .5s; }
+#pet.st-sleeping .z3 { animation-delay: 1s; }
+
+/* 常驻：眨眼（所有状态） */
+#pet .pet-eyes { animation: pet-blink 4.5s infinite; transform-origin: 60px 56px; }
+
+/* 部件可见性（默认隐藏，按状态显示） */
+#pet .pet-eyes-happy, #pet .pet-eyes-closed, #pet .pet-mouth-smile,
+#pet .pet-cup, #pet .pet-zzz, #pet .pet-stars, #pet .pet-sweat { visibility: hidden; }
+#pet.st-happy .pet-eyes, #pet.st-sleeping .pet-eyes { visibility: hidden; }
+#pet.st-happy .pet-eyes-happy, #pet.st-happy .pet-mouth-smile,
+#pet.st-happy .pet-stars, #pet.st-sleeping .pet-eyes-closed,
+#pet.st-sleeping .pet-zzz, #pet.st-break .pet-cup { visibility: visible; }
+#pet.st-sleeping .pet-antenna-ball, #pet.st-sleeping .pet-antenna { opacity: .4; }
+
+@keyframes pet-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.045); } }
+@keyframes pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes pet-sway { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes pet-wobble { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes pet-jump { 0%,100% { transform: translateY(0); } 45% { transform: translateY(-16px); } 60% { transform: translateY(-16px); } }
+@keyframes pet-type { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+@keyframes pet-blink { 0%,91%,100% { transform: scaleY(1); } 94%,97% { transform: scaleY(.08); } }
+@keyframes pet-sweat { 0% { opacity: 0; transform: translateY(-4px); } 25% { opacity: 1; } 80% { opacity: 1; transform: translateY(10px); } 100% { opacity: 0; transform: translateY(14px); } }
+@keyframes pet-zfloat { 0% { opacity: 0; transform: translate(0,0); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(8px,-18px); } }
+@keyframes pet-steam { 0% { opacity: 0; } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes pet-star { 0%,100% { opacity: .4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
+#pet.st-happy .pet-star { animation: pet-star 1s ease-in-out infinite; }
+#pet.st-happy .s2 { animation-delay: .3s; }
+#pet.st-happy .s3 { animation-delay: .6s; }

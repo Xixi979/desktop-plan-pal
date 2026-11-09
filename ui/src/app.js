@@ -644,7 +644,7 @@
       </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
   }
 
-  // ---- 小人 ----
+  // ---- 小人（v0.2：Sprite 状态机，由计划数据驱动 Pet.setState） ----
   function updatePet() {
     const pet = $('pet');
     const bubble = $('pet-bubble');
@@ -658,25 +658,52 @@
       const task = current.taskId ? store.getTask(current.taskId) : null;
       const end = new Date(current.end).getHours() * 60 + new Date(current.end).getMinutes();
       if (current.type === 'break') {
-        pet.firstChild.textContent = '🍵';
-        bubble.textContent = `休息中，还剩 ${end - nm} 分钟～`;
+        Pet.setState('break', `休息中，还剩 ${end - nm} 分钟～`);
       } else if (task && task.checklist && task.checklist.length) {
         const ck = ckStats(task);
-        pet.firstChild.textContent = '🧑‍💻';
-        bubble.textContent = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
+        const msg = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
+        // 达标全勾但块还没结束 → 庆祝
+        if (ck.done >= ck.total && task.status !== 'done') Pet.setState('happy', `「${task.title}」达标啦，太棒了！🎉`);
+        else Pet.setState('working', msg);
       } else {
-        pet.firstChild.textContent = '🧑‍💻';
-        bubble.textContent = `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`;
+        Pet.setState('working', `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`);
       }
+      return;
+    }
+    // 深夜（23:00 后 / 6:00 前）→ 打瞌睡
+    if (nm >= 23 * 60 || nm < 6 * 60) {
+      Pet.setState('sleeping', '夜深了，小人先睡啦… zzZ');
+      return;
+    }
+    // 今天所有任务全部完成 → 庆祝
+    const tasks = store.listTasks();
+    const todayTasks = tasks.filter((t) => t.status !== 'done');
+    if (tasks.length && !todayTasks.length) {
+      Pet.setState('happy', '今天的计划都完成啦，好好休息！🎉');
+      return;
+    }
+    // 今天剩余待办总时长超出每日容量 → 疲惫提醒
+    const ity = store.getIntensity();
+    const cap = ity ? ity.dailyLoadCapMinutes : 360;
+    const todayStr0 = todayStr();
+    let load = 0;
+    for (const b of blocks) {
+      if (b.type === 'break' || b.taskId == null) continue;
+      if (b.start.slice(0, 10) !== todayStr0) continue;
+      const t = store.getTask(b.taskId);
+      if (!t || t.status === 'done') continue;
+      load += Math.round((new Date(b.end) - new Date(b.start)) / 60000);
+    }
+    if (load > cap) {
+      Pet.setState('tired', `今天还有 ${Math.round(load / 60 * 10) / 10} 小时任务，超过容量 ${cap} 分钟，考虑砍掉或顺延一些吧…`);
       return;
     }
     const next = blocks
       .filter((b) => new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes() > nm)
       .sort((a, b) => a.start.localeCompare(b.start))[0];
-    pet.firstChild.textContent = '🚶';
-    bubble.textContent = next
+    Pet.setState('idle', next
       ? `接下来 ${next.start.slice(11)}：${next.taskId && store.getTask(next.taskId) ? store.getTask(next.taskId).title : '计划'}`
-      : '今天的计划都完成啦，好好休息！';
+      : '今天暂时没有安排啦，去「⚡加计划」里添加吧！');
   }
 
   // ---- 事件绑定 ----

@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>桌面计划小人 · v0.1</title>
+<title>桌面计划小人 · v0.2</title>
 <style>
 /* 桌面计划小人 v0.1 样式（浅色主题） */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -177,6 +177,51 @@ button.mini { padding: 2px 10px; font-size: 12px; margin-left: 8px; vertical-ali
 }
 #pp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ---- v0.2：小人 Sprite + 状态机动画 ---- */
+#pet { transition: transform .3s; }
+#pet .pet-svg { display: block; }
+#pet.st-happy { animation: pet-jump .55s ease-in-out infinite; }
+#pet.st-idle .pet-body { animation: pet-breathe 2.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-body { animation: pet-bob .5s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-arm { animation: pet-type .35s ease-in-out infinite; }
+#pet.st-working .arm-l { animation-delay: .18s; transform-origin: 23px 65px; }
+#pet.st-working .arm-r { transform-origin: 97px 65px; }
+#pet.st-break .pet-body { animation: pet-sway 2.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-break .pet-steam { animation: pet-steam 1.8s linear infinite; opacity: 0; }
+#pet.st-tired .pet-body { animation: pet-wobble 3.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-tired .pet-sweat { animation: pet-sweat 1.6s ease-in infinite; opacity: 0; }
+#pet.st-sleeping .pet-body { animation: pet-breathe 3.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-sleeping .pet-z { animation: pet-zfloat 2.4s ease-out infinite; opacity: 0; }
+#pet.st-sleeping .z2 { animation-delay: .5s; }
+#pet.st-sleeping .z3 { animation-delay: 1s; }
+
+/* 常驻：眨眼（所有状态） */
+#pet .pet-eyes { animation: pet-blink 4.5s infinite; transform-origin: 60px 56px; }
+
+/* 部件可见性（默认隐藏，按状态显示） */
+#pet .pet-eyes-happy, #pet .pet-eyes-closed, #pet .pet-mouth-smile,
+#pet .pet-cup, #pet .pet-zzz, #pet .pet-stars, #pet .pet-sweat { visibility: hidden; }
+#pet.st-happy .pet-eyes, #pet.st-sleeping .pet-eyes { visibility: hidden; }
+#pet.st-happy .pet-eyes-happy, #pet.st-happy .pet-mouth-smile,
+#pet.st-happy .pet-stars, #pet.st-sleeping .pet-eyes-closed,
+#pet.st-sleeping .pet-zzz, #pet.st-break .pet-cup { visibility: visible; }
+#pet.st-sleeping .pet-antenna-ball, #pet.st-sleeping .pet-antenna { opacity: .4; }
+
+@keyframes pet-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.045); } }
+@keyframes pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes pet-sway { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes pet-wobble { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes pet-jump { 0%,100% { transform: translateY(0); } 45% { transform: translateY(-16px); } 60% { transform: translateY(-16px); } }
+@keyframes pet-type { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+@keyframes pet-blink { 0%,91%,100% { transform: scaleY(1); } 94%,97% { transform: scaleY(.08); } }
+@keyframes pet-sweat { 0% { opacity: 0; transform: translateY(-4px); } 25% { opacity: 1; } 80% { opacity: 1; transform: translateY(10px); } 100% { opacity: 0; transform: translateY(14px); } }
+@keyframes pet-zfloat { 0% { opacity: 0; transform: translate(0,0); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(8px,-18px); } }
+@keyframes pet-steam { 0% { opacity: 0; } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes pet-star { 0%,100% { opacity: .4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
+#pet.st-happy .pet-star { animation: pet-star 1s ease-in-out infinite; }
+#pet.st-happy .s2 { animation-delay: .3s; }
+#pet.st-happy .s3 { animation-delay: .6s; }
+
 </style>
 <script>
 // ES5 兼容性预检：老内核浏览器无法解析新版 JS 时给出明确提示（本段必须用 ES5 写法）
@@ -198,9 +243,9 @@ if (!window.__PLAN_PAL_COMPAT__) {
     + '或安装最新版 Edge / Chrome。</p></div>');
 }
 </script>
-<div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
+<div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.1.11 · 2026-11-09 08:39</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.2.0 · 2026-11-09 08:58</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -1330,6 +1375,104 @@ window.Ics = { parseIcs };
 
 </script>
 <script>
+/* 桌面计划小人 v0.2 —— Sprite + 状态机（纯 SVG + CSS 动画，零依赖）
+ *
+ * 六种状态（Pet.setState 由 app.js 按计划数据驱动调用）：
+ *   idle     待机        呼吸 + 眨眼，气泡显示接下来要做什么
+ *   working  工作中      身体快速上下小幅起伏 + 手臂敲击
+ *   break    休息中      左右摇摆 + 端茶杯
+ *   happy    达标/全完成  跳跃庆祝 + 眼睛变弯 + 周围小星星
+ *   tired    超载疲惫    缓慢摇晃 + 流汗
+ *   sleeping 打瞌睡      眼睛闭合 + Zzz 上浮（深夜或无计划）
+ *
+ * 兼容性：本文件禁用 ?. ?? replaceAll 等 ES2020+ 语法（与 app.js 同规则）。
+ */
+(function () {
+  'use strict';
+
+  var SVG = [
+    '<svg class="pet-svg" viewBox="0 0 120 130" width="96" height="104" aria-hidden="true">',
+    '  <ellipse class="pet-shadow" cx="60" cy="122" rx="26" ry="5" fill="#0f172a" opacity=".12"/>',
+    '  <g class="pet-all">',
+    '    <g class="pet-stars">',
+    '      <text class="pet-star s1" x="18" y="30" font-size="14">✦</text>',
+    '      <text class="pet-star s2" x="96" y="22" font-size="12">✦</text>',
+    '      <text class="pet-star s3" x="102" y="52" font-size="10">✦</text>',
+    '    </g>',
+    '    <g class="pet-zzz">',
+    '      <text class="pet-z z1" x="86" y="34" font-size="13">Z</text>',
+    '      <text class="pet-z z2" x="96" y="24" font-size="11">z</text>',
+    '      <text class="pet-z z3" x="104" y="16" font-size="9">z</text>',
+    '    </g>',
+    '    <path class="pet-sweat" d="M94 40 q5 8 0 12 q-5 -4 0 -12" fill="#7dd3fc"/>',
+    '    <g class="pet-body">',
+    '      <line class="pet-antenna" x1="60" y1="26" x2="60" y2="14" stroke="#4f6ef7" stroke-width="3" stroke-linecap="round"/>',
+    '      <circle class="pet-antenna-ball" cx="60" cy="11" r="4" fill="#f59e0b"/>',
+    '      <path class="pet-body-shape" d="M28 62 q0 -38 32 -38 q32 0 32 38 q0 40 -32 40 q-32 0 -32 -40" fill="#dbe4ff" stroke="#4f6ef7" stroke-width="3"/>',
+    '      <g class="pet-face">',
+    '        <g class="pet-eyes">',
+    '          <circle class="pet-eye" cx="47" cy="56" r="4.5" fill="#1f2937"/>',
+    '          <circle class="pet-eye" cx="73" cy="56" r="4.5" fill="#1f2937"/>',
+    '        </g>',
+    '        <path class="pet-eyes-happy" d="M42 58 q5 -7 10 0 M68 58 q5 -7 10 0" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>',
+    '        <path class="pet-eyes-closed" d="M42 57 h11 M68 57 h11" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>',
+    '        <circle class="pet-blush" cx="40" cy="66" r="4" fill="#fbcfe8"/>',
+    '        <circle class="pet-blush" cx="80" cy="66" r="4" fill="#fbcfe8"/>',
+    '        <path class="pet-mouth" d="M55 68 q5 5 10 0" fill="none" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>',
+    '        <path class="pet-mouth-smile" d="M54 67 q6 8 12 0 q-6 3 -12 0" fill="#1f2937"/>',
+    '      </g>',
+    '      <g class="pet-arm arm-l"><rect x="16" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/></g>',
+    '      <g class="pet-arm arm-r"><rect x="90" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/></g>',
+    '      <g class="pet-cup">',
+    '        <rect x="88" y="76" width="16" height="12" rx="2" fill="#fff" stroke="#b45309" stroke-width="2"/>',
+    '        <path d="M104 79 q6 3 0 6" fill="none" stroke="#b45309" stroke-width="2"/>',
+    '        <path class="pet-steam" d="M93 72 q2 -4 0 -7 M97 72 q2 -4 0 -7" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>',
+    '      </g>',
+    '    </g>',
+    '  </g>',
+    '</svg>',
+  ].join('');
+
+  var VALID = ['idle', 'working', 'break', 'happy', 'tired', 'sleeping'];
+  var current = '';
+  var root = null;
+  var bubble = null;
+
+  function mount() {
+    root = document.getElementById('pet');
+    if (!root || root.querySelector('.pet-svg')) return;
+    root.insertAdjacentHTML('afterbegin', SVG);
+    root.classList.add('st-idle');
+    bubble = document.getElementById('pet-bubble');
+  }
+
+  /** 状态机：切换视觉状态 + 更新气泡文案（文案可为空表示不变） */
+  function setState(state, message) {
+    if (!root) mount();
+    if (!root) return;
+    if (VALID.indexOf(state) < 0) state = 'idle';
+    if (state !== current) {
+      root.classList.remove('st-' + current);
+      root.classList.add('st-' + state);
+      current = state;
+    }
+    if (bubble && typeof message === 'string' && message) bubble.textContent = message;
+  }
+
+  function getState() { return current; }
+
+  // 页面加载后立即可见（app.js init 之前也显示待机状态）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+
+  window.Pet = { mount: mount, setState: setState, getState: getState };
+})();
+
+</script>
+<script>
 /* 桌面计划小人 v0.1 界面逻辑（纯 JS，无依赖）
  * v0.1.5 新增：多通道录入（一句话/图片/链接）、达标清单（逐条打勾）、计划关联文件夹 */
 (function () {
@@ -1976,7 +2119,7 @@ window.Ics = { parseIcs };
       </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
   }
 
-  // ---- 小人 ----
+  // ---- 小人（v0.2：Sprite 状态机，由计划数据驱动 Pet.setState） ----
   function updatePet() {
     const pet = $('pet');
     const bubble = $('pet-bubble');
@@ -1990,25 +2133,52 @@ window.Ics = { parseIcs };
       const task = current.taskId ? store.getTask(current.taskId) : null;
       const end = new Date(current.end).getHours() * 60 + new Date(current.end).getMinutes();
       if (current.type === 'break') {
-        pet.firstChild.textContent = '🍵';
-        bubble.textContent = `休息中，还剩 ${end - nm} 分钟～`;
+        Pet.setState('break', `休息中，还剩 ${end - nm} 分钟～`);
       } else if (task && task.checklist && task.checklist.length) {
         const ck = ckStats(task);
-        pet.firstChild.textContent = '🧑‍💻';
-        bubble.textContent = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
+        const msg = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
+        // 达标全勾但块还没结束 → 庆祝
+        if (ck.done >= ck.total && task.status !== 'done') Pet.setState('happy', `「${task.title}」达标啦，太棒了！🎉`);
+        else Pet.setState('working', msg);
       } else {
-        pet.firstChild.textContent = '🧑‍💻';
-        bubble.textContent = `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`;
+        Pet.setState('working', `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`);
       }
+      return;
+    }
+    // 深夜（23:00 后 / 6:00 前）→ 打瞌睡
+    if (nm >= 23 * 60 || nm < 6 * 60) {
+      Pet.setState('sleeping', '夜深了，小人先睡啦… zzZ');
+      return;
+    }
+    // 今天所有任务全部完成 → 庆祝
+    const tasks = store.listTasks();
+    const todayTasks = tasks.filter((t) => t.status !== 'done');
+    if (tasks.length && !todayTasks.length) {
+      Pet.setState('happy', '今天的计划都完成啦，好好休息！🎉');
+      return;
+    }
+    // 今天剩余待办总时长超出每日容量 → 疲惫提醒
+    const ity = store.getIntensity();
+    const cap = ity ? ity.dailyLoadCapMinutes : 360;
+    const todayStr0 = todayStr();
+    let load = 0;
+    for (const b of blocks) {
+      if (b.type === 'break' || b.taskId == null) continue;
+      if (b.start.slice(0, 10) !== todayStr0) continue;
+      const t = store.getTask(b.taskId);
+      if (!t || t.status === 'done') continue;
+      load += Math.round((new Date(b.end) - new Date(b.start)) / 60000);
+    }
+    if (load > cap) {
+      Pet.setState('tired', `今天还有 ${Math.round(load / 60 * 10) / 10} 小时任务，超过容量 ${cap} 分钟，考虑砍掉或顺延一些吧…`);
       return;
     }
     const next = blocks
       .filter((b) => new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes() > nm)
       .sort((a, b) => a.start.localeCompare(b.start))[0];
-    pet.firstChild.textContent = '🚶';
-    bubble.textContent = next
+    Pet.setState('idle', next
       ? `接下来 ${next.start.slice(11)}：${next.taskId && store.getTask(next.taskId) ? store.getTask(next.taskId).title : '计划'}`
-      : '今天的计划都完成啦，好好休息！';
+      : '今天暂时没有安排啦，去「⚡加计划」里添加吧！');
   }
 
   // ---- 事件绑定 ----
