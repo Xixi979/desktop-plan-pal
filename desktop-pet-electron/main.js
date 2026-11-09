@@ -10,6 +10,8 @@ const path = require('path');
 const fs = require('fs');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
+const ICON_PATH = path.join(__dirname, 'icon.png');
+const APP_ICON = fs.existsSync(ICON_PATH) ? ICON_PATH : undefined;
 
 // 桌宠拖拽：渲染进程发增量，主进程移动对应窗口
 ipcMain.on('pet-move', (event, dx, dy) => {
@@ -59,6 +61,7 @@ function createMainWindow() {
     autoHideMenuBar: true,
     title: '桌面计划小人',
     backgroundColor: '#f4f6fb',
+    icon: APP_ICON,
     webPreferences: { sandbox: true },
   });
   Menu.setApplicationMenu(null);
@@ -75,6 +78,7 @@ function createPetWindow() {
     hasShadow: false,
     alwaysOnTop: true,
     resizable: true,
+    skipTaskbar: true, // 桌宠不占任务栏位置
     minWidth: 200,
     minHeight: 260,
     webPreferences: { sandbox: true, preload: path.join(__dirname, 'preload.js') },
