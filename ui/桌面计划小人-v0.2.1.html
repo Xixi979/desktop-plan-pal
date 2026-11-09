@@ -245,7 +245,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
 </script>
 <div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.2.0 · 2026-11-09 10:19</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.2.1 · 2026-11-09 10:26</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -2234,6 +2234,11 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
   }
 
   // ---- 文件夹 ----
+  // v0.2.1 浏览器兜底：支持 File System Access API（Edge/Chrome）时可直接选择文件夹并列出资料清单；
+  // handle 仅存内存（会话级），folderPath 持久化的是文件夹名/路径字符串，Tauri 桌面端仍用路径打开。
+  const CAN_PICK_DIR = typeof window.showDirectoryPicker === 'function';
+  const dirHandles = new Map(); // taskId → FileSystemDirectoryHandle
+
   async function saveFolder(tid) {
     const input = document.querySelector(`input[data-folder="${tid}"]`);
     if (!input) return;
@@ -2243,7 +2248,45 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
   async function copyFolder(tid) {
     const t = store.getTask(tid);
     if (!t || !t.folderPath) return;
-    try { await navigator.clipboard.writeText(t.folderPath); } catch (e) { /* 忽略 */ }
+    try {
+      await navigator.clipboard.writeText(t.folderPath);
+      showToast('📁 路径已复制');
+    } catch (e) { showToast('复制失败，请手动选择路径文本复制'); }
+  }
+  /** 浏览器选择文件夹：读出文件清单展示（最多 8 个 + 省略） */
+  async function pickFolder(tid) {
+    if (!CAN_PICK_DIR) { showToast('当前环境不支持选择文件夹，请手动粘贴路径'); return; }
+    let handle;
+    try {
+      handle = await window.showDirectoryPicker();
+    } catch (e) { return; // 用户取消
+    }
+    dirHandles.set(tid, handle);
+    const names = [];
+    try {
+      for await (const [name, h] of handle.entries()) {
+        if (names.length >= 9) break;
+        if (h.kind === 'file') names.push(name);
+      }
+    } catch (e) { /* 权限受限时忽略清单 */ }
+    await store.updateTask(tid, { folderPath: handle.name });
+    showToast(`📁 已关联「${handle.name}」${names.length ? `，发现 ${names.length} 个文件` : ''}`);
+    renderTasks();
+  }
+  /** 文件夹资料清单徽标（选过文件夹的会话内展示） */
+  async function folderListing(tid) {
+    const handle = dirHandles.get(tid);
+    if (!handle) return '';
+    const names = [];
+    try {
+      for await (const [name, h] of handle.entries()) {
+        if (names.length >= 8) break;
+        if (h.kind === 'file') names.push(name);
+      }
+    } catch (e) { return ''; }
+    if (!names.length) return '';
+    const more = names.length >= 8 ? ' …' : '';
+    return `<div class="attach-box">📄 ${esc(handle.name)}：${names.map(esc).join('、')}${more}</div>`;
   }
 
   // ---- 排程 ----
@@ -2416,8 +2459,10 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
             <input data-folder="${t.id}" placeholder="资料文件夹路径，如 C:\\Users\\你\\Desktop\\高数作业" value="${esc(t.folderPath || '')}" style="flex:1;min-width:180px">
             <button data-act="folder-save" data-id="${t.id}" title="保存路径">保存</button>
             <button data-act="folder-copy" data-id="${t.id}" title="复制路径">📋</button>
-            ${window.__TAURI__ ? `<button data-act="folder-open" data-id="${t.id}" title="打开文件夹">📂</button>` : ''}
+            ${CAN_PICK_DIR ? `<button data-act="folder-pick" data-id="${t.id}" title="选择文件夹并列出资料">📂 选择</button>` : ''}
+            ${window.__TAURI__ ? `<button data-act="folder-open" data-id="${t.id}" title="打开文件夹">📂 打开</button>` : ''}
           </div>
+          <div data-folder-list="${t.id}"></div>
           ${(t.linkUrls || []).length ? `<div class="attach-box">${(t.linkUrls || []).map((u) =>
             `🔗 <a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join('<br>')}</div>`
             : (t.linkUrl ? `<div class="attach-box">🔗 <a href="${esc(t.linkUrl)}" target="_blank" rel="noopener">${esc(t.linkUrl)}</a></div>` : '')}
@@ -2425,6 +2470,14 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
         </details>
       </li>`;
     }).join('') || '<li class="empty">还没有计划，试试上方三种录入方式：一句话 / 图片 / 链接～</li>';
+    // 异步填充文件夹资料清单（选过文件夹的会话内）
+    for (const t of tasks) {
+      if (!dirHandles.has(t.id)) continue;
+      folderListing(t.id).then((html) => {
+        const el = document.querySelector(`[data-folder-list="${t.id}"]`);
+        if (el && html) el.innerHTML = html;
+      });
+    }
   }
 
   function renderEvents() {
@@ -2642,6 +2695,9 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
         return;
       } else if (btn.dataset.act === 'folder-copy') {
         await copyFolder(id);
+        return;
+      } else if (btn.dataset.act === 'folder-pick') {
+        await pickFolder(id);
         return;
       } else if (btn.dataset.act === 'folder-open') {
         // Tauri 桌面端：调用 rust 侧 open_folder 命令（v0.2 接入）；浏览器端降级为复制
