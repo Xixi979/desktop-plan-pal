@@ -48,7 +48,7 @@ const nlpJs = toBrowserJs('core/src/nlp.ts', 'Nlp', [
 const appJs = read('ui/src/app.js');
 const petJs = read('ui/src/pet.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.2.2 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.2.4 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->

@@ -89,6 +89,36 @@
     }
     if (!document.getElementById('pet-bubble').textContent.includes('测试idle')) throw new Error('气泡未更新');
   });
+  // v0.2.3 达标条目编辑 / 删除
+  await tryStep('达标条目悬停出现修改删除按钮', async () => {
+    const row = document.querySelector('#task-list .ck-item');
+    if (!row) throw new Error('无达标条目');
+    if (!row.querySelector('button[data-act="ck-edit"]') || !row.querySelector('button[data-act="ck-del"]')) {
+      throw new Error('缺少 ck-edit / ck-del 按钮');
+    }
+  });
+  await tryStep('达标条目删除生效', async () => {
+    const row = document.querySelector('#task-list .ck-item');
+    const tid = row.querySelector('button[data-act="ck-del"]').dataset.tid;
+    const before = window.__pal.store.getTask(tid).checklist.length;
+    row.querySelector('button[data-act="ck-del"]').click();
+    await sleep(400);
+    const after = window.__pal.store.getTask(tid).checklist.length;
+    if (after !== before - 1) throw new Error('删除前 ' + before + ' 后 ' + after);
+  });
+  await tryStep('达标条目内联修改保存', async () => {
+    const row = document.querySelector('#task-list .ck-item');
+    const btn = row.querySelector('button[data-act="ck-edit"]');
+    btn.click(); await sleep(150);
+    const editor = row.querySelector('.ck-edit-input');
+    if (!editor) throw new Error('编辑框未出现');
+    editor.value = '自测修改后的达标要求';
+    editor.dispatchEvent(new Event('blur'));
+    await sleep(400);
+    const tid = btn.dataset.tid;
+    const hit = window.__pal.store.getTask(tid).checklist.some((c) => c.text === '自测修改后的达标要求');
+    if (!hit) throw new Error('修改未保存');
+  });
   out.push('DONE');
   paint();
 })();

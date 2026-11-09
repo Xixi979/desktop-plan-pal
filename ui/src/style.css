@@ -106,9 +106,23 @@ footer a { color: #6b7280; }
 .t-detail summary:hover { color: #4f6ef7; }
 .ck-box { margin: 8px 0; padding: 8px 10px; background: #f8fafc; border-radius: 8px; }
 .ck-item {
-  display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 13px;
 }
-.ck-item.ck-done span { color: #9ca3af; text-decoration: line-through; }
+.ck-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
+.ck-main span { word-break: break-all; }
+.ck-item.ck-done .ck-main span { color: #9ca3af; text-decoration: line-through; }
+.ck-ops { display: flex; gap: 2px; opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+.ck-item:hover .ck-ops { opacity: 1; }
+.ck-ops button {
+  border: none; background: transparent; cursor: pointer; font-size: 12px;
+  padding: 2px 5px; border-radius: 6px; color: #9ca3af; line-height: 1;
+}
+.ck-ops button:hover { background: #e5e7eb; color: #ef4444; }
+.ck-ops button[data-act="ck-edit"]:hover { color: #4f6ef7; }
+.ck-edit-input {
+  flex: 1; min-width: 0; font-size: 13px; padding: 3px 8px;
+  border: 1.5px solid #4f6ef7; border-radius: 6px; outline: none; background: #fff;
+}
 .ck-add-row { margin-top: 6px; }
 .folder-box { margin: 8px 0; padding: 8px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; }
 .attach-box { margin: 6px 0; font-size: 12px; word-break: break-all; }

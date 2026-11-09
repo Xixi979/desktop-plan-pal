@@ -69,6 +69,7 @@
   };
 
   const store = new Store.PlanStore(new LocalStorageAdapter('plan-pal'), 'browser');
+  window.__pal = { store }; // 自测/调试句柄
   let blocks = [];
 
   // ---- 安全存储：预览沙盒/隐私模式下 localStorage 可能被禁用（访问即抛错），
@@ -623,10 +624,16 @@
         ck.total ? `<span class="badge ck-badge" title="达标进度">${ck.done}/${ck.total}</span>` : '',
       ].join('');
       const ckHtml = (t.checklist || []).map((c) => `
-        <label class="ck-item ${c.done ? 'ck-done' : ''}">
-          <input type="checkbox" data-act="ck-toggle" data-tid="${t.id}" data-ckid="${c.id}" ${c.done ? 'checked' : ''}>
-          <span>${esc(c.text)}</span>
-        </label>`).join('');
+        <div class="ck-item ${c.done ? 'ck-done' : ''}" data-ckrow="${c.id}">
+          <label class="ck-main">
+            <input type="checkbox" data-act="ck-toggle" data-tid="${t.id}" data-ckid="${c.id}" ${c.done ? 'checked' : ''}>
+            <span>${esc(c.text)}</span>
+          </label>
+          <span class="ck-ops">
+            <button data-act="ck-edit" data-tid="${t.id}" data-ckid="${c.id}" title="修改这条要求">✏️</button>
+            <button data-act="ck-del" data-tid="${t.id}" data-ckid="${c.id}" title="删除这条要求">✕</button>
+          </span>
+        </div>`).join('');
       return `
       <li class="${t.status === 'done' ? 'done' : ''}">
         <div class="t-main">
@@ -883,6 +890,46 @@
         const input = document.querySelector(`input[data-ck-input="${id}"]`);
         if (input) { await addCheckItem(id, input.value); }
         return; // addCheckItem 内部已渲染
+      } else if (btn.dataset.act === 'ck-del') {
+        const t = store.getTask(btn.dataset.tid);
+        if (!t || !t.checklist) return;
+        const item = t.checklist.find((c) => c.id === btn.dataset.ckid);
+        if (!item) return;
+        await store.updateTask(t.id, { checklist: t.checklist.filter((c) => c.id !== item.id) });
+        showToast('已删除该条达标要求');
+        renderTasks();
+        reschedule();
+        return;
+      } else if (btn.dataset.act === 'ck-edit') {
+        const row = btn.closest('.ck-item');
+        const t = store.getTask(btn.dataset.tid);
+        const item = t && t.checklist ? t.checklist.find((c) => c.id === btn.dataset.ckid) : null;
+        if (!row || !item) return;
+        const span = row.querySelector('.ck-main span');
+        if (!span || row.querySelector('.ck-edit-input')) return;
+        const editor = document.createElement('input');
+        editor.className = 'ck-edit-input';
+        editor.value = item.text;
+        span.replaceWith(editor);
+        editor.focus();
+        editor.select();
+        const save = async () => {
+          const val = editor.value.trim();
+          if (!val) { showToast('内容不能为空，已还原'); }
+          else if (val !== item.text) {
+            await store.updateTask(t.id, {
+              checklist: t.checklist.map((c) => (c.id === item.id ? Object.assign({}, c, { text: val }) : c)),
+            });
+            showToast('✓ 已修改达标要求');
+          }
+          renderTasks();
+        };
+        editor.addEventListener('keydown', (e2) => {
+          if (e2.key === 'Enter') { e2.preventDefault(); editor.blur(); }
+          if (e2.key === 'Escape') { editor.value = item.text; editor.blur(); }
+        });
+        editor.addEventListener('blur', save, { once: true });
+        return;
       } else if (btn.dataset.act === 'folder-save') {
         await saveFolder(id);
         return;
