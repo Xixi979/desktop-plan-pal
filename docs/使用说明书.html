@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>桌面计划小人 · 使用说明书</title>
+<style>
+  :root { --blue:#4f6ef7; --ink:#1f2937; --muted:#6b7280; --bg:#f6f8ff; --card:#ffffff; --line:#e5e9f5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; color:var(--ink); background:var(--bg); line-height:1.75; }
+  .wrap { max-width:860px; margin:0 auto; padding:32px 24px 80px; }
+  header.hero { background:linear-gradient(135deg,#eef2ff,#fdf6e8); border:1px solid var(--line); border-radius:18px; padding:28px 28px 20px; margin-bottom:28px; }
+  .hero-flex { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  h1 { font-size:26px; margin:0 0 6px; }
+  .sub { color:var(--muted); font-size:14px; }
+  .badge { display:inline-block; background:var(--blue); color:#fff; border-radius:999px; font-size:12px; padding:2px 12px; margin-left:8px; vertical-align:middle; }
+  h2 { font-size:19px; margin:36px 0 12px; padding-left:12px; border-left:4px solid var(--blue); }
+  h3 { font-size:15px; margin:18px 0 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 20px; margin:12px 0; }
+  table { border-collapse:collapse; width:100%; font-size:14px; background:var(--card); border-radius:10px; overflow:hidden; }
+  th,td { border:1px solid var(--line); padding:8px 12px; text-align:left; vertical-align:top; }
+  th { background:#eef2ff; white-space:nowrap; }
+  kbd { background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:1px 8px; font-size:13px; }
+  .tip { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:14px; margin:10px 0; }
+  .warn { background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 14px; font-size:14px; margin:10px 0; }
+  .ok { color:#16a34a; font-weight:bold; }
+  .no { color:#dc2626; font-weight:bold; }
+  ul { padding-left:22px; } li { margin:4px 0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .grid2 { grid-template-columns:1fr; } }
+  .toc { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 20px; font-size:14px; }
+  .toc a { color:var(--blue); text-decoration:none; }
+  .pet-static { flex:none; }
+  code { background:#eef2ff; border-radius:5px; padding:1px 6px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="hero-flex">
+    <svg class="pet-static" viewBox="0 0 120 130" width="110" height="119" aria-hidden="true">
+      <ellipse cx="60" cy="122" rx="26" ry="5" fill="#0f172a" opacity=".12"/>
+      <g>
+        <line x1="60" y1="26" x2="60" y2="14" stroke="#4f6ef7" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="60" cy="11" r="4" fill="#f59e0b"/>
+        <path d="M28 62 q0 -38 32 -38 q32 0 32 38 q0 40 -32 40 q-32 0 -32 -40" fill="#dbe4ff" stroke="#4f6ef7" stroke-width="3"/>
+        <circle cx="47" cy="56" r="4.5" fill="#1f2937"/>
+        <circle cx="73" cy="56" r="4.5" fill="#1f2937"/>
+        <circle cx="40" cy="66" r="4" fill="#fbcfe8"/>
+        <circle cx="80" cy="66" r="4" fill="#fbcfe8"/>
+        <path d="M55 68 q5 5 10 0" fill="none" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="16" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/>
+        <rect x="90" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/>
+        <rect x="88" y="76" width="16" height="12" rx="2" fill="#fff" stroke="#b45309" stroke-width="2"/>
+        <path d="M104 79 q6 3 0 6" fill="none" stroke="#b45309" stroke-width="2"/>
+      </g>
+    </svg>
+    <div>
+      <h1>桌面计划小人 · 使用说明书 <span class="badge">v0.2.6</span></h1>
+      <div class="sub">桌宠 × 自动排程的桌面计划助手 —— 把计划交给小人，它帮你排好每一天。</div>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <b>目录</b>：
+  <a href="#start">1 快速上手</a> ·
+  <a href="#pet">2 桌面小人</a> ·
+  <a href="#plan">3 加计划</a> ·
+  <a href="#check">4 达标机制</a> ·
+  <a href="#course">5 固定课表</a> ·
+  <a href="#schedule">6 自动排程</a> ·
+  <a href="#params">7 强度参数</a> ·
+  <a href="#data">8 数据与备份</a> ·
+  <a href="#faq">9 常见问题</a>
+</nav>
+
+<h2 id="start">1. 快速上手</h2>
+<div class="card">
+  <ul>
+    <li><b>启动</b>：双击桌面上的 <kbd>桌面小人.bat</kbd>，屏幕上会出现一只悬浮的蓝色小人。</li>
+    <li><b>打开主窗口</b>：<b>双击小人</b>，弹出功能主窗口（计划、课表、参数都在这里）。</li>
+    <li><b>移动小人</b>：按住小人<b>拖动</b>到屏幕任意位置。</li>
+    <li><b>关闭小人</b>：鼠标悬停在小人上，右上方会出现红色 <kbd>✕</kbd>，点击即可退出。</li>
+    <li><b>关闭主窗口</b>：直接点窗口右上角的 ✕，小人不受影响。</li>
+  </ul>
+  <div class="tip">💡 小人是<b>透明悬浮窗</b>，不占任务栏；主窗口关闭后再双击小人即可随时打开。</div>
+</div>
+
+<h2 id="pet">2. 桌面小人：六种状态</h2>
+<p>小人会根据你的计划数据<b>自动变换表情和动作</b>，气泡里会提示接下来要做什么：</p>
+<table>
+  <tr><th>状态</th><th>什么时候出现</th><th>小人在做什么</th></tr>
+  <tr><td>🧍 待机</td><td>没有正在进行的任务</td><td>呼吸、眨眼，气泡提示下一件事</td></tr>
+  <tr><td>💻 工作中</td><td>当前时段排了任务</td><td>身体起伏 + 手臂敲击，提示「还剩 X 分钟」</td></tr>
+  <tr><td>🍵 休息中</td><td>排程的休息块</td><td>左右摇摆、端着茶杯</td></tr>
+  <tr><td>🎉 达标庆祝</td><td>某计划达标 / 今日全部完成</td><td>跳跃、眼睛变弯、周围冒星星</td></tr>
+  <tr><td>😥 超载疲惫</td><td>当日任务超过日负荷上限</td><td>缓慢摇晃、流汗，提醒你砍任务</td></tr>
+  <tr><td>😴 打瞌睡</td><td>深夜，或没有任何计划</td><td>闭眼，Zzz 上浮</td></tr>
+</table>
+
+<h2 id="plan">3. 加计划：四种录入方式</h2>
+<p>点主窗口顶部的 <kbd>⚡ 加计划</kbd> 展开，四种 Tab 任选：</p>
+
+<div class="card">
+<h3>① 一句话录入（最快）</h3>
+<p>直接输入一句话，自动识别<b>标题 / 时长 / 截止日 / 类别</b>：<br>
+<code>写实验报告 3小时 周五前</code> → 标题「写实验报告」、时长 180 分钟、DDL 周五。</p>
+<p>支持接入大模型（OpenAI 兼容接口）做<b>智能解析</b>：在「🎛️ 强度参数」底部填接口地址、模型名、API Key；未配置时用内置规则解析，接口失败也会自动降级，不影响使用。</p>
+</div>
+
+<div class="card">
+<h3>② 图片录入</h3>
+<ul>
+  <li>支持<b>多选 / 拖入 / Ctrl+V 粘贴</b>，自动压缩成缩略图（最多 12 张，可移除）。</li>
+  <li>图片里的文字会自动 OCR 识别，并入「达标要求来源」（可编辑）。</li>
+  <li>计划名称、类别可自定义；没有文字时按文件名生成达标要求。</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>③ 链接录入</h3>
+<ul>
+  <li>一次粘贴<b>多条链接</b>（空格或换行分隔）：B站视频、GitHub、在线文档、网课……</li>
+  <li>常见网站自动识别标题；每条链接自动生成「查看内容 + 整理要点」达标项。</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>④ 手动表单</h3>
+<p>精确填写标题、类别、预计分钟数，适合一句话说不清的任务。</p>
+</div>
+
+<div class="tip">💡 一句话录入时，如果标题和已有计划同名，会<b>自动并入</b>该计划而不是新建。</div>
+
+<h2 id="check">4. 达标机制：把「做完了」说清楚</h2>
+<div class="card">
+  <ul>
+    <li>每个计划有一份<b>达标清单</b>（来源：备注按「、」「；」拆分，或图片 OCR、链接自动生成）。</li>
+    <li>逐条<b>打勾 ✅</b>；全部达标 → 计划自动变为「已完成」，小人跳起来庆祝 🎉。</li>
+    <li>取消任意一条 → 计划自动退回「已排期」，重新参与排程。</li>
+    <li>悬停条目可 <kbd>✏️ 修改</kbd> 文字、<kbd>✕ 删除</kbd> 不要的条目。</li>
+  </ul>
+</div>
+
+<h2 id="course">5. 固定课表：不被打扰的硬时间</h2>
+<p>点 <kbd>📅 固定课表</kbd> 展开。课表时间<b>不参与自动排程</b>，排程时会自动避开。</p>
+
+<div class="card">
+<h3>四种添加方式</h3>
+<ul>
+  <li><b>手动添加</b>：填名称、星期、起止时间。</li>
+  <li><b>批量文字行</b>：每行一门课，格式 <code>高等数学 周一 08:00-09:40</code> 或 <code>大学英语 星期三 第3-4节</code>。</li>
+  <li><b>📥 导入 ICS</b>：日历文件一键导入。</li>
+  <li><b>📷 图片导入课表</b>（v0.2.6 重点增强）：
+    <ul>
+      <li>支持<b>教务系统「节次 × 星期」网格课表</b>截图/照片（如首经贸研究生课表）：自动按列头星期、行头节次定位，识别每格课名，连节课自动合并。</li>
+      <li>也支持文字行式课表图片。</li>
+      <li>首次使用需联网下载中文识别模型（约 20~60 秒），请耐心等待提示。</li>
+      <li>时间按默认 13 节制作息表换算，导入后每门课可 <kbd>✏️</kbd> 修改；OCR 个别错字（如「挖掘」认成「控握」）悬停手改即可。</li>
+    </ul>
+  </li>
+</ul>
+</div>
+<div class="tip">💡 课表条目悬停出现 <kbd>✏️</kbd> 和 <kbd>✕</kbd>，可随时改时间、换星期或删除。</div>
+
+<h2 id="schedule">6. 自动排程：把计划塞进空闲时间</h2>
+<div class="card">
+  <ul>
+    <li>排程引擎自动找今天的<b>空闲时段</b>（避开课表、过去时间、休息），按<b>多因子评分</b>（DDL 紧急度、时长匹配、类别轮转等）把任务放进时间轴。</li>
+    <li><b>🔄 重新排程</b>：推倒重排。<b>增量重排</b>会保留已结束/进行中的块，只重排未来的，不打断你正在做的事。</li>
+    <li><b>↩️ 撤销</b>：排程结果不满意一键回退。</li>
+    <li><b>🕐 今日时间轴</b>：查看今天每个时段安排了什么；小人状态与时间轴实时联动。</li>
+    <li>当日任务总量超过日负荷上限时，小人会变<b>疲惫脸</b>提醒你砍掉或顺延一些。</li>
+  </ul>
+</div>
+
+<h2 id="params">7. 强度参数：按自己的节奏来</h2>
+<p>点 <kbd>🎛️ 强度参数</kbd> 展开，6 个参数随意调：</p>
+<table>
+  <tr><th>参数</th><th>含义</th><th>默认思路</th></tr>
+  <tr><td>日负荷上限</td><td>一天最多安排多少分钟任务</td><td>超了小人会提醒</td></tr>
+  <tr><td>单块上限 / 下限</td><td>每个任务块的最长 / 最短时长</td><td>大任务自动切块</td></tr>
+  <tr><td>最小休息</td><td>两个工作块之间的休息时长</td><td>自动生成休息块</td></tr>
+  <tr><td>连续工作上限</td><td>最多连续工作多久</td><td>到点强制休息</td></tr>
+  <tr><td>精力类型</td><td>上午型 / 夜猫型等</td><td>影响时段评分偏好</td></tr>
+</table>
+
+<h2 id="data">8. 数据与备份</h2>
+<div class="card">
+  <ul>
+    <li>所有数据保存在<b>本机本地</b>（浏览器本地存储），不上传任何服务器。</li>
+    <li><b>📤 导出数据</b>：一键导出 JSON 备份文件。</li>
+    <li><b>📥 导入备份</b>：换电脑或误删后可恢复。</li>
+    <li><b>🗑️ 清空数据</b>（红色，谨慎使用）：清空全部本地数据，建议先导出备份。</li>
+  </ul>
+</div>
+<div class="warn">⚠️ 清空前请务必先导出备份；主窗口若提示「版本过旧」，关闭窗口重新双击小人打开即可加载新版。</div>
+
+<h2 id="faq">9. 常见问题</h2>
+<div class="card">
+  <h3>Q：双击小人没反应？</h3>
+  <p>确认 <kbd>桌面小人.bat</kbd> 启动的小人还在运行（悬停看 ✕）；若进程被杀，重新双击 bat 即可，数据不丢。</p>
+  <h3>Q：课表图片识别失败或没解析出课程？</h3>
+  <p>① 确认照片清晰、方向正、已联网；② 网格课表需要能看到「星期一~五」列头和「节次」行头；③ 实在不行改用手动或文字行方式添加。</p>
+  <h3>Q：导入的课程时间不对？</h3>
+  <p>时间按默认 13 节制作息表估算，各校节次时间不同——导入后悬停 <kbd>✏️</kbd> 修改起止时间即可。</p>
+  <h3>Q：主窗口按钮全部失灵或提示模块缺失？</h3>
+  <p>说明窗口加载的是旧版构建：关闭主窗口，重新双击小人打开（页头可看版本号 v0.2.6）。</p>
+  <h3>Q：任务会传到云端吗？</h3>
+  <p>不会。全部数据只在本地；配了大模型接口时，仅「一句话文本」会发给你自己填的接口地址。</p>
+</div>
+
+<p class="sub" style="margin-top:32px">桌面计划小人（desktop-plan-pal）v0.2.6 · MIT 开源 · 项目地址：github.com/Xixi979/desktop-plan-pal</p>
+</div>
+</body>
+</html>
