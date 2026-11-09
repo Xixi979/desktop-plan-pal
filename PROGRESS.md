@@ -4,12 +4,14 @@
 > 任何新会话（包括电脑关机重启后）开工前，**必须先读本文件**，按「下一步」继续，
 > 并用 `git log --oneline -5` 确认最新提交。进度永不丢失：代码在磁盘、提交在 Git、状态在本文件。
 
-- **最后更新**：2026-11-09 16:50
-- **当前阶段**：v0.1.11 发布准备完成（导入备份闭环 + 用户手册 + README 现状化）
-  - 数据安全闭环：store.restoreAll（备份 JSON 整体替换，格式校验抛错，撤销历史清空，7/7 测试）+ UI「📥 导入备份」按钮（确认弹窗 → 恢复 → 全量重渲染重排）
-  - docs/USAGE.md 用户手册：打开方式/三通道录入/达标/课表/强度参数/视图/数据安全/常见问题
-  - README 更新：状态改「v0.1 已完成（桌面打包中）」、新增 v0.1 功能清单与快速开始、文档索引
-  - 自测 9 步全通过；四套测试 7+19+5+5 全绿；无 ES2020 残留
+- **最后更新**：2026-11-09 17:00
+- **当前阶段**：v0.2.0 小人 Sprite + 状态机完成；GitHub 发布被连接器权限阻塞（见下一步 0）
+  - v0.2.0 小人动画：ui/src/pet.js（SVG 小机器人 + 六态状态机 window.Pet），app.js updatePet 改为数据驱动 Pet.setState；样式六组 keyframes（style.css v0.2 段）
+  - 六态：idle 呼吸眨眼 / working 敲击 / break 摇摆端茶 / happy 跳跃庆祝（达标全勾或今日全完成）/ tired 流汗（今日剩余负载>容量）/ sleeping 打瞌睡（23:00-6:00）
+  - selftest 改为构建自动生成：ui/selftest.inject.js（注入脚本）→ build-browser.mjs 产出 ui/selftest.html；新增小人 SVG 渲染 + 六态切换两步，11 步全 OK
+  - 版本化文件：ui/桌面计划小人-v0.2.0.html（旧 v0.1.11 已删）
+  - 自测 11 步全通过；四套测试 19+7+5+5 全绿；ES2020 扫描仅剩兼容预检代码与注释两处误报
+  - **GitHub 发布受阻**：mcp github 连接器 token 403（无建仓写权限，仅读）；npm 源仍不通。需用户：① 在 github.com 手动建空仓 desktop-plan-pal 并提供 PAT，或 ② 授权连接器写权限
   - v0.1.9 ICS 导入：core/src/ics.ts（RFC5545 子集：折行展开、\, \n 转义、DTSTART/DTEND 本地时刻、RRULE FREQ=DAILY/WEEKLY+BYDAY、跨天收缩为当天 24:00、全天事件跳过并计数、同名同时段去重导入），测试 5/5
   - v0.1.9 周视图：本周一~周日 7 列日程概览（固定🔒+任务块按时间排序，今日高亮），「🕐 今日时间轴」标题栏「切周视图/切日视图」切换
   - selftest.html 新增周视图切换步骤；无头 Edge 真实点击自测全通过；无 ES2020 残留（构建后扫描已纳入流程）
@@ -44,10 +46,10 @@
 
 ## ⏭️ 下一步（按顺序）
 
-1. **v0.1 发布**：GitHub 建仓推送（需要网络/用户操作）+ Releases 挂 ui/index.html 与启动器；README 补截图/动图
-2. SQLite 落地：待 npm 源可用（装 better-sqlite3）或 Tauri 打包时接 rusqlite；接口已抽象好（StorageAdapter）
-3. 进入 v0.2：小人动画（Sprite + 状态机）、自然语言 LLM 双路由、📂 打开文件夹接 Tauri、增量重排
-4. 用户试用 v0.1.11 收集反馈：桌面启动器 open-plan-pal.bat 打开使用
+0. **GitHub 发布**：连接器 token 只有读权限（403）。用户二选一：网页建空仓 desktop-plan-pal + 提供 PAT 配本地 push；或连接器提权后再走 MCP 建仓推送。推送内容已就绪（本地 main 干净）
+1. SQLite 落地：待 npm 源可用（装 better-sqlite3）或 Tauri 打包时接 rusqlite；接口已抽象好（StorageAdapter）
+2. 进入 v0.2 后续：自然语言 LLM 双路由、📂 打开文件夹接 Tauri、增量重排；小人动画已完成（063be81）
+3. 用户试用 v0.2.0 收集反馈：桌面启动器 open-plan-pal.bat 打开（注意浏览器缓存，认准页头 v0.2.0）
 
 ## 🔧 环境备注（重要）
 
