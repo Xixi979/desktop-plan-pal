@@ -765,6 +765,14 @@
       const input = ev.target.closest('input[data-ck-input]');
       if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
     };
+    // 课表列表：删除按钮（✕）
+    $('evt-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn || btn.dataset.act !== 'delevt') return;
+      await store.removeFixedEvent(btn.dataset.id);
+      renderEvents();
+      reschedule();
+    };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
       if (!title) return;

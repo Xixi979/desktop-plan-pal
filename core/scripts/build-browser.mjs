@@ -39,6 +39,7 @@ const checklistJs = toBrowserJs('core/src/checklist.ts', 'Checklist', [
 
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
+const BUILD_TAG = `v0.1.7 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -54,7 +55,7 @@ ${css}
 <body>
 <div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.1</span></h1>
+  <h1>桌面计划小人 <span class="ver">${BUILD_TAG}</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>

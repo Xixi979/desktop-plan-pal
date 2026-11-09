@@ -160,7 +160,7 @@ footer a { color: #6b7280; }
 <body>
 <div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.1</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.1.7 · 2026-11-09 06:03</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -1874,6 +1874,14 @@ window.Checklist = { mergeChecklist };
     $('task-list').onkeydown = (ev) => {
       const input = ev.target.closest('input[data-ck-input]');
       if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
+    };
+    // 课表列表：删除按钮（✕）
+    $('evt-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn || btn.dataset.act !== 'delevt') return;
+      await store.removeFixedEvent(btn.dataset.id);
+      renderEvents();
+      reschedule();
     };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
