@@ -4,8 +4,12 @@
 > 任何新会话（包括电脑关机重启后）开工前，**必须先读本文件**，按「下一步」继续，
 > 并用 `git log --oneline -5` 确认最新提交。进度永不丢失：代码在磁盘、提交在 Git、状态在本文件。
 
-- **最后更新**：2026-11-09 17:00
-- **当前阶段**：v0.2.0 小人 Sprite + 状态机完成；GitHub 发布被连接器权限阻塞（见下一步 0）
+- **最后更新**：2026-11-09 17:22
+- **当前阶段**：✅ v0.2.0 已发布 GitHub（PAT 方式，全部历史已推送）
+  - 仓库：https://github.com/Xixi979/desktop-plan-pal（Public，23+ 提交，main 分支）
+  - Release v0.2.0：含下载资产 desktop-plan-pal-v0.2.0.html（https://github.com/Xixi979/desktop-plan-pal/releases/tag/v0.2.0）
+  - 凭据：PAT 存于 ~/.git-credentials（credential.helper store），后续 push 免密；git remote origin 已配置
+  - 连接器 GitHub OAuth 授权两次失败（403 无写权限→重授权后 401），最终改走用户 PAT 方案成功
   - v0.2.0 小人动画：ui/src/pet.js（SVG 小机器人 + 六态状态机 window.Pet），app.js updatePet 改为数据驱动 Pet.setState；样式六组 keyframes（style.css v0.2 段）
   - 六态：idle 呼吸眨眼 / working 敲击 / break 摇摆端茶 / happy 跳跃庆祝（达标全勾或今日全完成）/ tired 流汗（今日剩余负载>容量）/ sleeping 打瞌睡（23:00-6:00）
   - selftest 改为构建自动生成：ui/selftest.inject.js（注入脚本）→ build-browser.mjs 产出 ui/selftest.html；新增小人 SVG 渲染 + 六态切换两步，11 步全 OK
@@ -46,10 +50,9 @@
 
 ## ⏭️ 下一步（按顺序）
 
-0. **GitHub 发布**：连接器 token 只有读权限（403）。用户二选一：网页建空仓 desktop-plan-pal + 提供 PAT 配本地 push；或连接器提权后再走 MCP 建仓推送。推送内容已就绪（本地 main 干净）
 1. SQLite 落地：待 npm 源可用（装 better-sqlite3）或 Tauri 打包时接 rusqlite；接口已抽象好（StorageAdapter）
-2. 进入 v0.2 后续：自然语言 LLM 双路由、📂 打开文件夹接 Tauri、增量重排；小人动画已完成（063be81）
-3. 用户试用 v0.2.0 收集反馈：桌面启动器 open-plan-pal.bat 打开（注意浏览器缓存，认准页头 v0.2.0）
+2. v0.2 后续：自然语言 LLM 双路由、📂 打开文件夹接 Tauri、增量重排；小人动画已完成（063be81）
+3. 用户试用 v0.2.0 收集反馈：认准页头 v0.2.0；Release 资产或 ui/桌面计划小人-v0.2.0.html 均可
 
 ## 🔧 环境备注（重要）
 

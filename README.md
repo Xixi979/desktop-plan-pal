@@ -21,7 +21,7 @@
 零依赖单文件：打开 `ui/index.html` 即用（推荐 Edge / Chrome 内核浏览器）。
 
 ```
-git clone https://github.com/<you>/desktop-plan-pal.git
+git clone https://github.com/Xixi979/desktop-plan-pal.git
 cd desktop-plan-pal
 # 双击 ui/index.html，或用浏览器打开
 ```

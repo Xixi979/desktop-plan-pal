@@ -204,7 +204,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
     <div id="week-view" class="hidden"></div>
   </section>
 </main>
-<footer>桌面计划小人 · 本地优先 · 数据仅保存在本机浏览器 · <a href="https://github.com/" target="_blank">GitHub</a></footer>
+<footer>桌面计划小人 · 本地优先 · 数据仅保存在本机浏览器 · <a href="https://github.com/Xixi979/desktop-plan-pal" target="_blank">GitHub</a></footer>
 <script>
 ${engineJs}
 </script>
