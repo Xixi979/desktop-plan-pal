@@ -4,8 +4,12 @@
 > 任何新会话（包括电脑关机重启后）开工前，**必须先读本文件**，按「下一步」继续，
 > 并用 `git log --oneline -5` 确认最新提交。进度永不丢失：代码在磁盘、提交在 Git、状态在本文件。
 
-- **最后更新**：2026-11-09 18:30
-- **当前阶段**：v0.2 自然语言 LLM 双路由完成并推送（f3d7599）
+- **最后更新**：2026-11-09 18:40
+- **当前阶段**：v0.2.1 计划文件夹浏览器联动完成并推送（25741f3）；v0.2 单机功能全部完成
+  - 📂 文件夹：File System Access API 探测（Edge/Chrome https 环境显示「📂 选择」，选后列资料清单≤8 项；handle 会话级、文件夹名持久化；file:// 下自动隐藏按钮）；📋 复制路径加 Toast
+  - 文档同步：README 状态改「✅ v0.2 单机完整版」+ v0.2 新增清单；USAGE 补 AI 设置/文件夹联动/小人六态说明
+  - 测试 53 全绿；自测 12 步全通过；版本化文件 ui/桌面计划小人-v0.2.1.html
+  - npm 源仍不通、cargo 不存在 → SQLite / Tauri 打包继续阻塞
   - 新增 core/src/nlp.ts：parseRule 规则引擎（时长半小时/一个半小时/1.5小时、时刻下午3点/晚上8点半、日期明天/后天/周X/大后天/已过月日自动推明年、优先级重要紧急、12 类关键词映射、标题清洗）、parseViaLLM（OpenAI 兼容，8s 超时，JSON 截取容错 markdown 围栏）、parseDual 双路由失败自动降级
   - UI：一句话加计划走双路由（预览/提交）；🎛️ 强度参数面板新增「🤖 AI 智能解析设置」折叠区（endpoint/model/key 存 LS 仅本机，llm-save/llm-clear）；旧 app.js parseQuick 下沉为 NLP.parseRule 包装
   - 调试记录：组合正则 alternation「一」分支不在捕获组导致 combo[1] 恒 undefined → 并入捕获组修复
@@ -60,8 +64,9 @@
 ## ⏭️ 下一步（按顺序）
 
 1. SQLite 落地：待 npm 源可用（装 better-sqlite3）或 Tauri 打包时接 rusqlite；接口已抽象好（StorageAdapter）
-2. v0.2 收尾：📂 打开文件夹接 Tauri（window.__TAURI__ 探测已预留）；LLM 双路由已完成（f3d7599）、增量重排已完成（062bfff）、小人动画已完成（063be81）
-3. 用户试用 v0.2.0 收集反馈：认准页头 v0.2.0；Release 资产或 ui/桌面计划小人-v0.2.0.html 均可
+2. Tauri 桌面打包：本机无 cargo/rust，待环境可用后接 📂 打开文件夹（window.__TAURI__ 探测已预留）
+3. v0.3（Web 版可先做）：数据统计页（完成率/实际vs计划）、WebDAV 手机同步设计
+4. 用户试用 v0.2.1 收集反馈：认准页头 v0.2.1；ui/桌面计划小人-v0.2.1.html
 
 ## 🔧 环境备注（重要）
 
