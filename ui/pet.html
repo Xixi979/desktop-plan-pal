@@ -225,6 +225,16 @@ html, body {
   background: linear-gradient(160deg, #1e2440 0%, #2a3358 60%, #35406b 100%);
   border-radius: 14px; user-select: none;
 }
+/* Electron 透明壳：背景全透明，只剩小人与气泡浮在桌面上 */
+html.in-electron, body.in-electron { background: transparent !important; border-radius: 0; }
+.pet-win-close {
+  display: none; position: fixed; top: 8px; right: 10px; z-index: 100;
+  width: 22px; height: 22px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.18); color: rgba(255,255,255,.85);
+  font-size: 12px; line-height: 22px; text-align: center; cursor: pointer;
+}
+body.in-electron .pet-win-close { display: block; }
+.pet-win-close:hover { background: rgba(255,255,255,.35); color: #fff; }
 #pet {
   position: fixed; left: calc(50% - 75px); right: auto; bottom: 18px;
   width: 150px; height: 150px;
@@ -456,7 +466,7 @@ html, body {
     if (e.key === 'plan-pal.blocks' || e.key === 'plan-pal.snap') tick();
   });
 
-  // 点击小人 → 打开主计划页
+  // 点击小人 → 打开主计划页（Electron 壳内由 main.js 拦截为同 session 新窗口）
   function bindOpen() {
     var pet = document.getElementById('pet');
     if (!pet) return;
@@ -466,7 +476,29 @@ html, body {
     });
   }
 
+  /** Electron 壳适配：透明背景 + 整窗拖动 + 右上角关闭按钮 */
+  function setupElectron() {
+    var isElectron = /Electron/i.test(navigator.userAgent);
+    if (!isElectron) return;
+    document.documentElement.classList.add('in-electron');
+    document.body.classList.add('in-electron');
+    // 整窗可拖动；小人本体与关闭按钮可点击（no-drag）
+    document.documentElement.style.webkitAppRegion = 'drag';
+    var pet = document.getElementById('pet');
+    if (pet) pet.style.webkitAppRegion = 'no-drag';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'pet-win-close';
+    closeBtn.textContent = '✕';
+    closeBtn.title = '关闭桌宠';
+    closeBtn.style.webkitAppRegion = 'no-drag';
+    closeBtn.addEventListener('click', function () {
+      try { window.close(); } catch (e) { /* 忽略 */ }
+    });
+    document.body.appendChild(closeBtn);
+  }
+
   function boot() {
+    setupElectron();
     Pet.mount();
     bindOpen();
     tick();

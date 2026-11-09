@@ -271,6 +271,16 @@ html, body {
   background: linear-gradient(160deg, #1e2440 0%, #2a3358 60%, #35406b 100%);
   border-radius: 14px; user-select: none;
 }
+/* Electron 透明壳：背景全透明，只剩小人与气泡浮在桌面上 */
+html.in-electron, body.in-electron { background: transparent !important; border-radius: 0; }
+.pet-win-close {
+  display: none; position: fixed; top: 8px; right: 10px; z-index: 100;
+  width: 22px; height: 22px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.18); color: rgba(255,255,255,.85);
+  font-size: 12px; line-height: 22px; text-align: center; cursor: pointer;
+}
+body.in-electron .pet-win-close { display: block; }
+.pet-win-close:hover { background: rgba(255,255,255,.35); color: #fff; }
 #pet {
   position: fixed; left: calc(50% - 75px); right: auto; bottom: 18px;
   width: 150px; height: 150px;

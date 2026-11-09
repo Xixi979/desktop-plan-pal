@@ -118,7 +118,7 @@
     if (e.key === 'plan-pal.blocks' || e.key === 'plan-pal.snap') tick();
   });
 
-  // 点击小人 → 打开主计划页
+  // 点击小人 → 打开主计划页（Electron 壳内由 main.js 拦截为同 session 新窗口）
   function bindOpen() {
     var pet = document.getElementById('pet');
     if (!pet) return;
@@ -128,7 +128,29 @@
     });
   }
 
+  /** Electron 壳适配：透明背景 + 整窗拖动 + 右上角关闭按钮 */
+  function setupElectron() {
+    var isElectron = /Electron/i.test(navigator.userAgent);
+    if (!isElectron) return;
+    document.documentElement.classList.add('in-electron');
+    document.body.classList.add('in-electron');
+    // 整窗可拖动；小人本体与关闭按钮可点击（no-drag）
+    document.documentElement.style.webkitAppRegion = 'drag';
+    var pet = document.getElementById('pet');
+    if (pet) pet.style.webkitAppRegion = 'no-drag';
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'pet-win-close';
+    closeBtn.textContent = '✕';
+    closeBtn.title = '关闭桌宠';
+    closeBtn.style.webkitAppRegion = 'no-drag';
+    closeBtn.addEventListener('click', function () {
+      try { window.close(); } catch (e) { /* 忽略 */ }
+    });
+    document.body.appendChild(closeBtn);
+  }
+
   function boot() {
+    setupElectron();
     Pet.mount();
     bindOpen();
     tick();

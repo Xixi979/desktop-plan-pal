@@ -1,0 +1,7 @@
+{
+  "name": "desktop-plan-pal-pet",
+  "version": "1.0.0",
+  "description": "桌面计划小人 · 透明悬浮桌宠窗（Electron 壳）",
+  "main": "main.js",
+  "private": true
+}
