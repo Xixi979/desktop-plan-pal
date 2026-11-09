@@ -1,0 +1,2038 @@
+<!DOCTYPE html>
+<!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面计划小人 · v0.1</title>
+<style>
+/* 桌面计划小人 v0.1 样式（浅色主题） */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: #f4f6fa; color: #1f2937; padding-bottom: 60px;
+}
+header {
+  background: #fff; padding: 14px 24px; display: flex;
+  justify-content: space-between; align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 10;
+}
+h1 { font-size: 20px; }
+h1 .ver { font-size: 12px; color: #6b7280; font-weight: normal; }
+h2 { font-size: 15px; margin-bottom: 10px; color: #374151; }
+.header-actions button { margin-left: 8px; }
+button {
+  background: #4f6ef7; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #3d5be0; }
+button.danger { background: #ef4444; }
+button.danger:hover { background: #dc2626; }
+input, select {
+  border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px;
+  font-size: 13px; background: #fff;
+}
+main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+.panel { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.panel.wide { grid-column: 1 / -1; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.form { margin-bottom: 10px; }
+.preview { font-size: 12px; color: #6b7280; margin-top: 6px; min-height: 16px; }
+#quick-input { flex: 1; min-width: 260px; }
+#task-title { flex: 1; min-width: 140px; }
+#evt-title { flex: 1; min-width: 120px; }
+ul { list-style: none; }
+#task-list li, #evt-list li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 4px;
+  border-bottom: 1px solid #f1f3f7; font-size: 13px;
+}
+#task-list li.done { opacity: .5; text-decoration: line-through; }
+#task-list li.empty, #evt-list li.empty { color: #9ca3af; border: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.meta { color: #6b7280; font-size: 12px; flex: 1; }
+.ops button { padding: 2px 8px; font-size: 12px; background: #eef1f8; color: #374151; }
+.ops button:hover { background: #dbe2f5; }
+.grid.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid.params label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5563; }
+.warning {
+  background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+  border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px;
+}
+#timeline-wrap { max-height: 560px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafbfd; }
+#timeline { position: relative; margin-left: 52px; }
+.hour-line { position: absolute; left: 0; right: 0; border-top: 1px dashed #e5e7eb; }
+.hour-line span { position: absolute; left: -50px; top: -8px; font-size: 11px; color: #9ca3af; }
+.block {
+  position: absolute; left: 8px; right: 8px; border-radius: 6px;
+  color: #1f2937; font-size: 12px; overflow: hidden; padding: 2px 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12); line-height: 1.4;
+}
+.block .b-title { pointer-events: none; }
+.block.fixed { background: #cbd5e1 !important; }
+.block.break { background: #86efac !important; }
+.now-line { position: absolute; left: 0; right: 0; border-top: 2px solid #ef4444; z-index: 5; }
+.now-line::before { content: "现在"; position: absolute; left: -50px; top: -9px; font-size: 11px; color: #ef4444; }
+#pet {
+  position: fixed; right: 24px; bottom: 24px; z-index: 99;
+  font-size: 40px; cursor: default; text-align: center;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.2));
+}
+#pet-bubble {
+  position: absolute; bottom: 110%; right: 0; white-space: nowrap;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 6px 12px; font-size: 13px; color: #374151;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#pet-bubble::after {
+  content: ""; position: absolute; right: 16px; top: 100%;
+  border: 6px solid transparent; border-top-color: #fff;
+}
+footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 20px; }
+footer a { color: #6b7280; }
+
+/* ---- v0.1.5：多通道录入 / 达标清单 / 文件夹 ---- */
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.tabs .tab {
+  background: #eef1f8; color: #4b5563; padding: 5px 12px; border-radius: 16px; font-size: 13px;
+}
+.tabs .tab.active { background: #4f6ef7; color: #fff; }
+.tabpane.hidden, .hidden { display: none; }
+.hint { font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+#img-drop {
+  border: 2px dashed #c7d2fe; border-radius: 8px; padding: 22px 12px; text-align: center;
+  color: #6b7280; font-size: 13px; cursor: pointer; transition: all .15s;
+}
+#img-drop:hover, #img-drop.dragging { border-color: #4f6ef7; background: #eef2ff; color: #4f6ef7; }
+.img-prev-wrap { text-align: center; margin: 10px 0; }
+#img-thumb { max-width: 200px; max-height: 140px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.badge { font-size: 12px; margin-left: 6px; background: #f3f4f6; border-radius: 8px; padding: 1px 6px; }
+.ck-badge { background: #ecfdf5; color: #059669; font-weight: bold; }
+#task-list li { display: block; }
+#task-list li .t-main { display: flex; align-items: center; gap: 8px; padding: 7px 4px; }
+.t-detail { margin: 0 4px 8px 18px; font-size: 13px; }
+.t-detail summary { cursor: pointer; color: #6b7280; font-size: 12px; user-select: none; }
+.t-detail summary:hover { color: #4f6ef7; }
+.ck-box { margin: 8px 0; padding: 8px 10px; background: #f8fafc; border-radius: 8px; }
+.ck-item {
+  display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 13px; cursor: pointer;
+}
+.ck-item.ck-done span { color: #9ca3af; text-decoration: line-through; }
+.ck-add-row { margin-top: 6px; }
+.folder-box { margin: 8px 0; padding: 8px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; }
+.attach-box { margin: 6px 0; font-size: 12px; word-break: break-all; }
+.attach-img { max-width: 220px; max-height: 160px; border-radius: 8px; display: block; margin-top: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.attach-box a { color: #4f6ef7; }
+#err-banner {
+  background: #fef2f2; color: #b91c1c; border-bottom: 1px solid #fecaca;
+  padding: 8px 24px; font-size: 13px;
+}
+.img-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.img-chip { position: relative; display: inline-block; }
+.img-chip img {
+  width: 84px; height: 64px; object-fit: cover; border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15); display: block;
+}
+.chip-x {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+  border-radius: 50%; background: #ef4444; color: #fff; font-size: 12px;
+  line-height: 18px; padding: 0; text-align: center;
+}
+.link-list { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.link-chip {
+  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  background: #f5f8ff; border: 1px solid #dbe4ff; border-radius: 6px; padding: 5px 8px;
+}
+.link-chip .chip-x { position: static; flex-shrink: 0; }
+
+/* ---- 板块折叠导航 ---- */
+#panel-nav {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+#panel-nav .nav-btn {
+  background: #eef1f8; color: #4b5563; border-radius: 16px; padding: 6px 16px; font-size: 13px;
+}
+#panel-nav .nav-btn:hover { background: #dbe2f5; }
+#panel-nav .nav-btn.active { background: #4f6ef7; color: #fff; }
+.nav-hint { font-size: 12px; color: #9ca3af; margin-left: 4px; }
+
+</style>
+</head>
+<body>
+<div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
+<header>
+  <h1>桌面计划小人 <span class="ver">v0.1.7 · 2026-11-09 06:03</span></h1>
+  <div class="header-actions">
+    <button id="btn-reschedule">🔄 重新排程</button>
+    <button id="btn-undo">↩️ 撤销</button>
+    <button id="btn-export">📤 导出数据</button>
+    <button id="btn-clear" class="danger">🗑️ 清空数据</button>
+  </div>
+</header>
+<main>
+  <nav id="panel-nav">
+    <button data-panel="panel-quick" class="nav-btn">⚡ 加计划</button>
+    <button data-panel="panel-events" class="nav-btn">📅 固定课表</button>
+    <button data-panel="panel-params" class="nav-btn">🎛️ 强度参数</button>
+    <button data-panel="panel-timeline" class="nav-btn">🕐 今日时间轴</button>
+    <span class="nav-hint">点击展开 / 收起板块 · 计划列表始终显示</span>
+  </nav>
+  <section class="panel wide" id="panel-tasks">
+    <h2>📝 计划列表</h2>
+    <div class="row form">
+      <input id="task-title" placeholder="标题">
+      <input id="task-cat" placeholder="类别" value="学习" style="max-width:90px">
+      <input id="task-min" type="number" placeholder="分钟" value="60" style="max-width:80px">
+      <input id="task-pri" type="number" min="1" max="5" value="3" style="max-width:60px" title="优先级1-5">
+      <input id="task-ddl" type="datetime-local" style="max-width:200px">
+      <button id="task-add">➕</button>
+    </div>
+    <ul id="task-list"></ul>
+  </section>
+  <section class="panel" id="panel-quick">
+    <h2>⚡ 加计划</h2>
+    <div class="tabs" id="entry-tabs">
+      <button class="tab active" data-tab="text">⌨️ 一句话</button>
+      <button class="tab" data-tab="image">🖼️ 图片</button>
+      <button class="tab" data-tab="link">🔗 链接</button>
+    </div>
+    <div class="tabpane" id="pane-text">
+      <div class="row">
+        <input id="quick-input" placeholder="例如：写实验报告 3小时 周五前（自动识别时长/DDL/类别）">
+        <button id="quick-add">添加</button>
+      </div>
+      <div id="quick-preview" class="preview"></div>
+    </div>
+    <div class="tabpane hidden" id="pane-image">
+      <div id="img-drop">点击选择 / 拖入图片（可多选）/ Ctrl+V 粘贴截图（如课程表、作业要求）</div>
+      <input id="img-file" type="file" accept="image/*" multiple hidden>
+      <div id="img-confirm" class="hidden">
+        <div id="img-thumbs" class="img-thumbs"></div>
+        <div class="row form">
+          <select id="img-target" title="新建计划，或补充到已有计划"><option value="new">➕ 新建计划</option></select>
+          <input id="img-title" placeholder="计划名称（可自定义）" style="flex:1;min-width:150px">
+          <input id="img-cat" placeholder="类别" value="学习" style="max-width:80px">
+          <input id="img-min" type="number" value="60" title="预计分钟" style="max-width:70px">
+          <button id="img-add">添加计划</button>
+        </div>
+        <input id="img-note" placeholder="备注 / 达标要求：用「、」或「；」分隔多条，如：看完第一课、做课后习题、整理错题 2小时 周五前" style="width:100%">
+        <div id="img-feedback" class="preview"></div>
+        <p class="hint">达标要求自动解析：备注按「、；」拆分逐条生成，文件名/链接也会生成对应条目；自动合并进目标计划——重复不加、缺的补上、同来源变动的更新。</p>
+      </div>
+      <p class="hint">当前为本地规则版：自动取文件名 + 备注识别时长/DDL；图片内文字 OCR 识别将在 v0.2 接入。</p>
+    </div>
+    <div class="tabpane hidden" id="pane-link">
+      <div class="row">
+        <input id="link-input" placeholder="粘贴链接（可多条，空格或换行分隔）：B站视频 / GitHub / 在线文档 / 网课…" style="flex:1;min-width:220px">
+        <button id="link-parse">识别</button>
+      </div>
+      <div id="link-confirm" class="hidden">
+        <div id="link-list" class="link-list"></div>
+        <div class="row form">
+          <select id="link-target" title="新建计划，或补充到已有计划"><option value="new">➕ 新建计划</option></select>
+          <input id="link-title" placeholder="计划名称（可自定义）" style="flex:1;min-width:150px">
+          <input id="link-cat" placeholder="类别" value="学习" style="max-width:80px">
+          <input id="link-min" type="number" value="60" title="预计分钟" style="max-width:70px">
+          <button id="link-add">添加计划</button>
+        </div>
+        <input id="link-note" placeholder="备注 / 达标要求：用「、」或「；」分隔多条，如：看完视频、做笔记 1小时" style="width:100%">
+        <div id="link-preview" class="preview"></div>
+        <p class="hint">达标要求自动解析：每条链接生成「查看内容 + 整理要点」条目，备注拆分逐条生成；自动合并——重复不加、缺的补上、同链接变动的更新。</p>
+      </div>
+      <p class="hint">当前为本地规则识别（站点/标题建议）；联网抓取网页标题将在 v0.2 接入 LLM 双路由。</p>
+    </div>
+  </section>
+  <section class="panel" id="panel-events">
+    <h2>📅 固定安排（课表）</h2>
+    <div class="row form">
+      <input id="evt-title" placeholder="名称">
+      <input id="evt-start" type="time" value="08:00" style="max-width:110px">
+      <input id="evt-end" type="time" value="09:40" style="max-width:110px">
+      <select id="evt-freq" style="max-width:110px">
+        <option value="daily">每天</option>
+        <option value="once">仅一次</option>
+      </select>
+      <button id="evt-add">➕</button>
+      <button id="evt-sample" title="载入睡眠+三节课的示例课表">载入示例课表</button>
+    </div>
+    <ul id="evt-list"></ul>
+  </section>
+  <section class="panel" id="panel-params">
+    <h2>🎛️ 强度参数</h2>
+    <div class="grid params">
+      <label>日负荷上限(分) <input id="p-load" type="number"></label>
+      <label>单块上限(分) <input id="p-bmax" type="number"></label>
+      <label>单块下限(分) <input id="p-bmin" type="number"></label>
+      <label>最小休息(分) <input id="p-break" type="number"></label>
+      <label>连续工作上限(分) <input id="p-chain" type="number"></label>
+      <label>精力类型
+        <select id="p-energy">
+          <option value="early">早起型</option>
+          <option value="night">夜猫型</option>
+          <option value="flat">全天平均</option>
+        </select>
+      </label>
+    </div>
+  </section>
+  <section class="panel wide" id="panel-timeline">
+    <h2>🕐 今日时间轴 <span id="today-label"></span></h2>
+    <div id="warnings"></div>
+    <div id="timeline-wrap"><div id="timeline"></div></div>
+  </section>
+</main>
+<footer>桌面计划小人 · 本地优先 · 数据仅保存在本机浏览器 · <a href="https://github.com/" target="_blank">GitHub</a></footer>
+<script>
+/**
+ * 桌面计划小人 — 排程引擎
+ *
+ * 对应设计文档《整体方案》第四节。v0.1 采用「贪心 + 多因子评分」：
+ * 引擎纯函数化（输入任务/课表/参数 → 输出 Block 列表），不依赖 UI，
+ * 可单元测试、可被手机端复用。
+ *
+ * 时间约定：所有 ISO 字符串均为本地朴素时间（无时区后缀），
+ * 内部统一转为「分钟数」做区间运算。
+ */
+
+                                                                            
+
+// ---------------------------------------------------------------------------
+// 时间工具
+// ---------------------------------------------------------------------------
+
+const MIN = 60_000;
+/** 链式连续工作判定：两次工作间隔小于该阈值视为同一连续链（分钟） */
+const CHAIN_GAP_THRESHOLD = 15;
+
+function toMin(iso        )         {
+  return Math.floor(new Date(iso).getTime() / MIN);
+}
+
+function toIso(minutes        )         {
+  const d = new Date(minutes * MIN);
+  const p = (n        ) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** "YYYY-MM-DD" → 当日 00:00 的分钟数 */
+function dayStartMin(date        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  return Math.floor(new Date(y, m - 1, d).getTime() / MIN);
+}
+
+function addDays(date        , n        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  const p = (x        ) => String(x).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+
+function weekdayOf(date        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay(); // 0=周日 … 6=周六
+}
+
+// ---------------------------------------------------------------------------
+// 固定事件展开（最小 RRULE 支持：DAILY / WEEKLY;BYDAY / 一次性）
+// ---------------------------------------------------------------------------
+
+const BYDAY_MAP                         = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+function occursOn(ev            , date        )          {
+  if (!ev.rrule) return date === ev.effectiveFrom;
+  if (date < ev.effectiveFrom) return false;
+  if (ev.effectiveUntil && date > ev.effectiveUntil) return false;
+  if (ev.exceptions?.includes(date)) return false;
+  const freq = /FREQ=(DAILY|WEEKLY)/.exec(ev.rrule)?.[1];
+  if (freq === 'DAILY') return true;
+  if (freq === 'WEEKLY') {
+    const byday = /BYDAY=([A-Z,]+)/.exec(ev.rrule)?.[1];
+    if (!byday) return weekdayOf(date) === weekdayOf(ev.effectiveFrom);
+    return byday.split(',').some((k) => BYDAY_MAP[k] === weekdayOf(date));
+  }
+  return false;
+}
+
+/** 固定事件在 date 当天的占用区间 [start, end)（分钟数） */
+function occupiedInterval(ev            , date        )                   {
+  const start = dayStartMin(date) + parseHHMM(ev.startTime);
+  const end = ev.endTime === '24:00'
+    ? dayStartMin(date) + 1440
+    : dayStartMin(date) + parseHHMM(ev.endTime);
+  return [start, Math.max(start, end)];
+}
+
+function parseHHMM(hhmm        )         {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// ---------------------------------------------------------------------------
+// 第一步：空闲槽位构造
+// ---------------------------------------------------------------------------
+
+                           
+                
+              
+ 
+
+/**
+ * 从固定事件中挖去已占用时间，得到 date 当天的自由时段。
+ * 短于 blockMinMinutes 的碎片槽直接丢弃（避免产生排不了的小缝）。
+ */
+function buildFreeSlots(
+  date        ,
+  fixedEvents              ,
+  profile                  ,
+)             {
+  const dayStart = dayStartMin(date);
+  const dayEnd = dayStart + 1440;
+
+  const occupied = fixedEvents
+    .filter((ev) => occursOn(ev, date))
+    .map((ev) => occupiedInterval(ev, date))
+    .sort((a, b) => a[0] - b[0]);
+
+  // 合并重叠区间
+  const merged                     = [];
+  for (const [s, e] of occupied) {
+    const last = merged[merged.length - 1];
+    if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else merged.push([s, e]);
+  }
+
+  // 取补集
+  const slots             = [];
+  let cursor = dayStart;
+  for (const [s, e] of merged) {
+    if (s > cursor) pushSlot(cursor, s);
+    cursor = Math.max(cursor, e);
+  }
+  if (cursor < dayEnd) pushSlot(cursor, dayEnd);
+
+  function pushSlot(s        , e        ) {
+    if (e - s >= profile.blockMinMinutes) slots.push({ start: toIso(s), end: toIso(e) });
+  }
+  return slots;
+}
+
+// ---------------------------------------------------------------------------
+// 第二步：多因子评分
+// ---------------------------------------------------------------------------
+
+                               
+                                                                
+                                                  
+                                               
+                                                
+                                                             
+ 
+
+/** 评分权重：DDL 紧迫度 > 精力匹配 > 优先级 = 碎片适配 */
+const WEIGHTS = { urgency: 0.35, priority: 0.2, energy: 0.25, fit: 0.2 };
+
+function scorePlacement(
+  task      ,
+  slot          ,
+  profile                  ,
+)                                           {
+  const slotLen = toMin(slot.end) - toMin(slot.start);
+
+  const deadlineUrgency = task.deadline
+    ? clamp(1 - (toMin(task.deadline) - toMin(slot.start)) / (14 * 1440), 0.05, 1)
+    : 0.2;
+
+  const priority = task.priority / 5;
+
+  const hour = new Date(slot.start).getHours();
+  const curve = profile.energyCurve;
+  const energyMatch = curve.length ? curve[hour % 24] / Math.max(...curve) : 1;
+
+  const needed = Math.min(task.estimatedMinutes, profile.blockMaxMinutes);
+  const slotFit = needed > 0 ? Math.min(1, slotLen / needed) : 1;
+
+  const factors               = {
+    deadlineUrgency, priority, energyMatch, slotFit, diversityPenalty: 0,
+  };
+  const score =
+    WEIGHTS.urgency * deadlineUrgency +
+    WEIGHTS.priority * priority +
+    WEIGHTS.energy * energyMatch +
+    WEIGHTS.fit * slotFit;
+  return { score, factors };
+}
+
+function clamp(x        , lo        , hi        )         {
+  return Math.min(hi, Math.max(lo, x));
+}
+
+// ---------------------------------------------------------------------------
+// 第三步：约束校验
+// ---------------------------------------------------------------------------
+
+/** 约束校验：单次放置是否违反强度约束（重叠/日负荷/连续链/最小休息间隔） */
+function validateConstraints(
+  candidate       ,
+  existingBlocks         ,
+  profile                  ,
+)                                        {
+  const violations           = [];
+  const cs = toMin(candidate.start);
+  const ce = toMin(candidate.end);
+  const day = candidate.start.slice(0, 10);
+
+  // 1. 不重叠
+  if (existingBlocks.some((b) => {
+    const bs = toMin(b.start), be = toMin(b.end);
+    return cs < be && bs < ce;
+  })) violations.push('overlap');
+
+  // 2. 日负荷上限（仅统计当日弹性任务块）
+  const dailyLoad = existingBlocks
+    .filter((b) => b.type === 'flexible' && b.start.slice(0, 10) === day)
+    .reduce((acc, b) => acc + (toMin(b.end) - toMin(b.start)), 0);
+  if (dailyLoad + (ce - cs) > profile.dailyLoadCapMinutes) violations.push('dailyLoadCap');
+
+  // 3. 最小休息间隔：与既有块相邻时，间隔必须 ≥ minBreakMinutes
+  for (const b of existingBlocks) {
+    const bs = toMin(b.start), be = toMin(b.end);
+    const gapBefore = cs - be;
+    const gapAfter = bs - ce;
+    if (gapBefore >= 0 && gapBefore < profile.minBreakMinutes) violations.push('minBreak');
+    if (gapAfter >= 0 && gapAfter < profile.minBreakMinutes) violations.push('minBreak');
+  }
+
+  // 4. 连续工作上限：与候选块连成链后的总工作时长不得超过上限
+  const chain = chainWorkMinutes(cs, ce, existingBlocks);
+  if (chain > profile.consecutiveWorkCapMinutes) violations.push('consecutiveCap');
+
+  return { ok: violations.length === 0, violations };
+}
+
+/** 计算与 [s,e) 通过"间隔 < CHAIN_GAP_THRESHOLD"相连的所有弹性块的总工作时长（含候选块本身） */
+function chainWorkMinutes(s        , e        , blocks         )         {
+  const intervals = blocks
+    .filter((b) => b.type === 'flexible')
+    .map((b) => [toMin(b.start), toMin(b.end)]                    );
+  const set                     = [[s, e]];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const iv of intervals) {
+      if (set.some(([a, b]) => iv[0] < b + CHAIN_GAP_THRESHOLD && a - CHAIN_GAP_THRESHOLD < iv[1])) {
+        if (!set.some(([a, b]) => iv[0] === a && iv[1] === b)) { set.push(iv); changed = true; }
+      }
+    }
+  }
+  return set.reduce((acc, [a, b]) => acc + (b - a), 0);
+}
+
+// ---------------------------------------------------------------------------
+// 容量预警
+// ---------------------------------------------------------------------------
+
+                                  
+                 
+                  
+ 
+
+// ---------------------------------------------------------------------------
+// 贪心排程
+// ---------------------------------------------------------------------------
+
+let blockSeq = 0;
+function nextBlockId()         {
+  return `blk-${(++blockSeq).toString(36)}-${Date.now().toString(36).slice(-4)}`;
+}
+
+                                                               
+
+/**
+ * 贪心排程：任务按「优先级降序 → DDL 升序」逐个放置到评分最高的空闲槽。
+ * 放置后自动收缩槽位并预留最小休息间隔；连续工作达到上限时插入休息块；
+ * DDL 前容量不足时产出 CapacityWarning。
+ */
+function greedySchedule(
+  tasks        ,
+  fixedEvents              ,
+  profile                  ,
+  rangeStart        ,
+  rangeEnd        ,
+)                                                                             {
+  const blocks          = [];
+  const unplaced         = [];
+  const warnings                    = [];
+  const dailyLoad = new Map                ();       // date → 弹性块总分钟
+  const categoryLoad = new Map                ();    // date|category → 分钟
+  const sameCatCount = new Map                ();    // date|category → 已放置块数（多样性惩罚）
+
+  // 构造日期范围内的全部空闲槽
+  const slots             = [];
+  let d = rangeStart.slice(0, 10);
+  const endDate = rangeEnd.slice(0, 10);
+  for (let i = 0; d <= endDate && i < 60; i++, d = addDays(d, 1)) {
+    for (const fs of buildFreeSlots(d, fixedEvents, profile)) {
+      slots.push({ date: d, start: toMin(fs.start), end: toMin(fs.end) });
+    }
+  }
+
+  const sorted = [...tasks].sort((a, b) =>
+    b.priority - a.priority ||
+    (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999') ||
+    b.estimatedMinutes - a.estimatedMinutes);
+
+  // 预检：不可拆分且超出单块上限 → 直接无法排布
+  const remainingMap = new Map                ();
+  for (const task of sorted) {
+    remainingMap.set(task.id, task.estimatedMinutes);
+    if (!task.splittable && task.estimatedMinutes > profile.blockMaxMinutes) {
+      remainingMap.set(task.id, 0);
+      unplaced.push(task);
+      if (task.deadline) pushCapacityWarning(task, task.estimatedMinutes);
+    }
+  }
+
+  // 轮转扫描：每一轮按优先级顺序给每个未完成任务放置一个块。
+  // 这样高优先级任务优先排入，且同一任务的多个块自然被其他任务交错，
+  // 多样性惩罚（同类别当日块数越多降权越多）则引导块分散到不同日期/时段。
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const task of sorted) {
+      const remaining = remainingMap.get(task.id) ?? 0;
+      if (remaining <= 0) continue;
+      const deadlineMin = task.deadline ? toMin(task.deadline) : Number.POSITIVE_INFINITY;
+
+      // 评分并排序所有候选槽（多样性惩罚参与排序）
+      const candidates = slots
+        .map((s, idx) => {
+          const base = scorePlacement(task, { start: toIso(s.start), end: toIso(s.end) }, profile).score;
+          const diversityPenalty = 0.1 * (sameCatCount.get(`${s.date}|${task.category}`) ?? 0);
+          return { idx, s, score: base - diversityPenalty };
+        })
+        .filter(({ s }) => s.end - s.start >= Math.max(profile.blockMinMinutes,
+          task.splittable ? 0 : task.estimatedMinutes))
+        .sort((a, b) => b.score - a.score);
+
+      candidateLoop:
+      for (const { idx, s } of candidates) {
+        const date = s.date;
+        // attempt 循环：链满插入休息块后重试同一槽位
+        for (let attempt = 0; attempt < 4; attempt++) {
+          // 候选块长度
+          let chunk = task.splittable
+            ? Math.min(remaining, profile.blockMaxMinutes, s.end - s.start)
+            : task.estimatedMinutes;
+          if (chunk < profile.blockMinMinutes) continue candidateLoop;
+          // DDL 截断：块必须完完全全落在 DDL 之前
+          if (s.start + chunk > deadlineMin) chunk = deadlineMin - s.start;
+          if (chunk < profile.blockMinMinutes) continue candidateLoop;
+          // 类别配额
+          const catKey = `${date}|${task.category}`;
+          const quota = profile.categoryQuotas[task.category];
+          if (quota != null && (categoryLoad.get(catKey) ?? 0) + chunk > quota) continue candidateLoop;
+
+          const start = s.start;
+          // 连续工作上限：必要时压缩块长
+          const chain = chainWorkMinutes(start, start + chunk, blocks);
+          if (chain > profile.consecutiveWorkCapMinutes) {
+            const others = chain - chunk;
+            chunk = profile.consecutiveWorkCapMinutes - others;
+            if (chunk < profile.blockMinMinutes) {
+              // 链已满：插入一个休息块（15 分钟），为后续工作断链，然后重试本槽位
+              const breakEnd = start + CHAIN_GAP_THRESHOLD;
+              blocks.push({ id: nextBlockId(), taskId: null, start: toIso(start),
+                end: toIso(breakEnd), type: 'break', locked: false, progress: 0 });
+              s.start = breakEnd + profile.minBreakMinutes;
+              if (s.start + profile.blockMinMinutes > s.end) removeSlot(idx);
+              continue;
+            }
+          }
+          const end = start + chunk;
+          const candidate        = { id: nextBlockId(), taskId: task.id, start: toIso(start),
+            end: toIso(end), type: 'flexible', locked: false, progress: 0 };
+
+          const v = validateConstraints(candidate, blocks, profile);
+          if (!v.ok) continue candidateLoop;
+
+          // 提交放置
+          blocks.push(candidate);
+          dailyLoad.set(date, (dailyLoad.get(date) ?? 0) + chunk);
+          categoryLoad.set(catKey, (categoryLoad.get(catKey) ?? 0) + chunk);
+          sameCatCount.set(catKey, (sameCatCount.get(catKey) ?? 0) + 1);
+          // 收缩槽位并预留最小休息间隔
+          s.start = end + profile.minBreakMinutes;
+          if (s.start + profile.blockMinMinutes > s.end) removeSlot(idx);
+
+          remainingMap.set(task.id, remaining - chunk);
+          progress = true;
+          break candidateLoop;
+        }
+      }
+    }
+  }
+
+  // 收尾：仍有剩余时长未排布的任务进入 unplaced，DDL 任务产出容量预警
+  for (const task of sorted) {
+    const remaining = remainingMap.get(task.id) ?? 0;
+    if (remaining > 0) {
+      unplaced.push(task);
+      if (task.deadline) pushCapacityWarning(task, remaining);
+    }
+  }
+
+  function removeSlot(idx        ) {
+    const i = slots.findIndex((_, i2) => i2 === idx);
+    if (i >= 0) slots.splice(i, 1);
+  }
+  function pushCapacityWarning(task      , remainingMin        ) {
+    warnings.push({
+      taskId: task.id,
+      message: `「${task.title}」在 DDL ${task.deadline} 前还有 ${remainingMin} 分钟排不下，建议提高每日负荷上限、拆分任务或调整 DDL。`,
+    });
+  }
+
+  return { blocks, unplaced, capacityWarnings: warnings };
+}
+
+// ---------------------------------------------------------------------------
+// 第四步（v0.2）：增量重排
+// ---------------------------------------------------------------------------
+
+/**
+ * 增量重排：只重排「未开始且未锁定」的块；用户手动拖过的块默认加锁；
+ * 超时任务的剩余时长重新入队，优先占用最近的低价值空闲槽。
+ */
+function incrementalReschedule(
+  blocks         ,
+  tasks        ,
+  fixedEvents              ,
+  profile                  ,
+  fromTime        ,
+)                                                   {
+  // TODO(v0.2)
+  void blocks; void tasks; void fixedEvents; void profile; void fromTime;
+  return { blocks: [], warnings: [] };
+}
+
+window.Engine = { toMin, toIso, occursOn, buildFreeSlots, scorePlacement, validateConstraints, greedySchedule, incrementalReschedule };
+
+</script>
+<script>
+/**
+ * 数据层：ChangeLog（变更日志）驱动的本地存储（v0.1，零依赖）
+ *
+ * 设计要点（对应整体方案第三、六节）：
+ * - 所有写操作追加 ChangeLogEntry（唯一同步单位），单向追加；
+ * - 定期落 Snapshot（快照）收缩日志；启动时 快照 + 增量日志重放 恢复状态；
+ * - 存储后端通过 StorageAdapter 抽象：Node 文件（FileAdapter）/ 内存（MemoryAdapter）/
+ *   浏览器 localStorage（由 UI 层实现同接口）——为 v0.3 同步与 SQLite 替换留好接口。
+ *
+ * 约束：仅使用可擦除 TS 语法（无参数属性/枚举），支持 Node --experimental-strip-types 直接运行。
+ */
+
+             
+                                                                   
+                    
+
+// ---------------------------------------------------------------------------
+// 存储适配器抽象
+// ---------------------------------------------------------------------------
+
+/** 数据快照：某 seq 时刻的全量状态，用于启动加速与日志收缩 */
+                           
+              
+                
+                            
+                                     
+                                
+ 
+
+                                 
+                                                           
+                                                              
+                                                         
+                                                             
+ 
+
+/** 内存适配器：测试与浏览器兜底用 */
+class MemoryAdapter {
+  entries                  ;
+  snapshot                 ;
+
+  constructor() {
+    this.entries = [];
+    this.snapshot = null;
+  }
+
+  appendEntry(entry                )       {
+    this.entries.push(entry);
+  }
+
+  readEntries()                   {
+    return [...this.entries];
+  }
+
+  saveSnapshot(snapshot          )       {
+    this.snapshot = JSON.parse(JSON.stringify(snapshot));
+  }
+
+  loadSnapshot()                  {
+    return this.snapshot ? JSON.parse(JSON.stringify(this.snapshot)) : null;
+  }
+}
+
+/** 文件适配器：Node 端落盘（changelog.jsonl 追加 + snapshot.json）；动态 import，浏览器构建不触发 */
+class FileAdapter {
+  baseDir        ;
+
+  constructor(baseDir        ) {
+    this.baseDir = baseDir;
+  }
+
+          async fs()                                             {
+    return import('node:fs/promises');
+  }
+
+  async appendEntry(entry                )                {
+    const fs = await this.fs();
+    await fs.mkdir(this.baseDir, { recursive: true });
+    await fs.appendFile(`${this.baseDir}/changelog.jsonl`, JSON.stringify(entry) + '\n', 'utf8');
+  }
+
+  async readEntries()                            {
+    const fs = await this.fs();
+    try {
+      const raw = await fs.readFile(`${this.baseDir}/changelog.jsonl`, 'utf8');
+      return raw.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    } catch {
+      return [];
+    }
+  }
+
+  async saveSnapshot(snapshot          )                {
+    const fs = await this.fs();
+    await fs.mkdir(this.baseDir, { recursive: true });
+    await fs.writeFile(`${this.baseDir}/snapshot.json`, JSON.stringify(snapshot), 'utf8');
+  }
+
+  async loadSnapshot()                           {
+    const fs = await this.fs();
+    try {
+      return JSON.parse(await fs.readFile(`${this.baseDir}/snapshot.json`, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PlanStore：状态仓库（重放 + 提交 + 撤销）
+// ---------------------------------------------------------------------------
+
+class PlanStore {
+  adapter                ;
+  deviceId        ;
+  seq        ;
+          tasks                   ;
+          fixedEvents                         ;
+          executionLogs                ;
+          intensity                         ;
+          history                  ;
+          idCounter        ;
+
+  constructor(adapter                , deviceId        ) {
+    this.adapter = adapter;
+    this.deviceId = deviceId;
+    this.seq = 0;
+    this.tasks = new Map();
+    this.fixedEvents = new Map();
+    this.executionLogs = [];
+    this.intensity = null;
+    this.history = [];
+    this.idCounter = 0;
+  }
+
+  /** 启动恢复：快照 + 重放增量日志（seq 大于快照的部分），然后落一次新快照收缩日志 */
+  async open()                {
+    const snap = await this.adapter.loadSnapshot();
+    if (snap) {
+      this.seq = snap.seq;
+      this.tasks = new Map(snap.tasks.map((t) => [t.id, t]));
+      this.fixedEvents = new Map(snap.fixedEvents.map((e) => [e.id, e]));
+      this.executionLogs = snap.executionLogs ?? [];
+      this.intensity = snap.intensity ?? null;
+    }
+    const entries = await this.adapter.readEntries();
+    for (const entry of entries) {
+      if (entry.seq > this.seq) {
+        this.replay(entry);
+        this.seq = entry.seq;
+      }
+      this.history.push(entry);
+    }
+    await this.saveSnapshot();
+  }
+
+  /** 重放单条日志到内存状态（纯状态变更，无 IO） */
+          replay(entry                )       {
+    switch (entry.entity) {
+      case 'task': {
+        if (entry.op === 'create') this.tasks.set(entry.entityId, entry.payload.after);
+        else if (entry.op === 'update') {
+          const t = this.tasks.get(entry.entityId);
+          if (t) Object.assign(t, entry.payload.after);
+        } else this.tasks.delete(entry.entityId);
+        break;
+      }
+      case 'fixedEvent': {
+        if (entry.op === 'create') this.fixedEvents.set(entry.entityId, entry.payload.after);
+        else if (entry.op === 'update') {
+          const ev = this.fixedEvents.get(entry.entityId);
+          if (ev) Object.assign(ev, entry.payload.after);
+        } else this.fixedEvents.delete(entry.entityId);
+        break;
+      }
+      case 'intensityProfile': {
+        if (entry.op === 'create' || entry.op === 'update') this.intensity = entry.payload.after;
+        break;
+      }
+      case 'executionLog': {
+        if (entry.op === 'create') this.executionLogs.push(entry.payload.after);
+        break;
+      }
+    }
+  }
+
+          nextId(prefix        )         {
+    return `${prefix}-${Date.now().toString(36)}-${(++this.idCounter).toString(36)}`;
+  }
+
+  /** 提交一条变更：深拷贝冻结（防对象别名污染）→ 重放内存 → 追加日志 → 记入历史 */
+          async commit(
+    entity                          ,
+    entityId        ,
+    op                      ,
+    payload         ,
+  )                          {
+    const entry                 = JSON.parse(JSON.stringify({
+      seq: ++this.seq,
+      entity, entityId, op,
+      timestamp: new Date().toISOString(),
+      deviceId: this.deviceId,
+      payload,
+    }));
+    this.replay(entry);
+    this.history.push(entry);
+    await this.adapter.appendEntry(entry);
+    return entry;
+  }
+
+  /** 落快照（收缩日志的依据） */
+  async saveSnapshot()                {
+    await this.adapter.saveSnapshot({
+      seq: this.seq,
+      tasks: [...this.tasks.values()],
+      fixedEvents: [...this.fixedEvents.values()],
+      intensity: this.intensity,
+      executionLogs: [...this.executionLogs],
+    });
+  }
+
+  // ---- 任务 ----
+
+  async addTask(input                             )                {
+    const task       = { ...input, id: this.nextId('task'), status: 'draft' };
+    await this.commit('task', task.id, 'create', { after: task });
+    return task;
+  }
+
+  async updateTask(id        , patch               )                {
+    const before = this.tasks.get(id);
+    if (!before) throw new Error(`task not found: ${id}`);
+    const after       = { ...before, ...patch };
+    // 达标规则（业务层强制，UI/同步/手机端一致生效）：
+    // 有达标清单且全部勾完 → 自动完成；取消任一勾选 → 自动回退为已排布
+    const ck = after.checklist;
+    if (ck && ck.length > 0) {
+      const allDone = ck.every((c) => c.done);
+      if (allDone && after.status !== 'done' && after.status !== 'cancelled') after.status = 'done';
+      if (!allDone && after.status === 'done') after.status = 'scheduled';
+    }
+    await this.commit('task', id, 'update', { before, after });
+    return after;
+  }
+
+  async deleteTask(id        )                {
+    const before = this.tasks.get(id);
+    if (!before) return;
+    await this.commit('task', id, 'delete', { before });
+  }
+
+  // ---- 固定事件 ----
+
+  async addFixedEvent(input                        )                      {
+    const ev             = { ...input, id: this.nextId('evt') };
+    await this.commit('fixedEvent', ev.id, 'create', { after: ev });
+    return ev;
+  }
+
+  async removeFixedEvent(id        )                {
+    const before = this.fixedEvents.get(id);
+    if (!before) return;
+    await this.commit('fixedEvent', id, 'delete', { before });
+  }
+
+  // ---- 强度参数 / 执行记录 ----
+
+  async setIntensity(profile                  )                {
+    await this.commit('intensityProfile', profile.id, 'update', {
+      before: this.intensity, after: profile,
+    });
+  }
+
+  async addExecutionLog(input                          )                        {
+    const log               = { ...input, id: this.nextId('log') };
+    await this.commit('executionLog', log.id, 'create', { after: log });
+    return log;
+  }
+
+  // ---- 查询 ----
+
+  listTasks()         {
+    return [...this.tasks.values()];
+  }
+
+  getTask(id        )                   {
+    return this.tasks.get(id);
+  }
+
+  listFixedEvents()               {
+    return [...this.fixedEvents.values()];
+  }
+
+  getIntensity()                          {
+    return this.intensity;
+  }
+
+  /** 撤销最近一条变更（追加补偿条目，日志本身不可变；补偿条目自身不可再撤销） */
+  async undo()                   {
+    let target = -1;
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      const entry = this.history[i];
+      // 跳过强度参数（配置类操作不参与撤销）与历史补偿条目（防止来回翻转）
+      if (entry.entity === 'intensityProfile') continue;
+      if (entry.payload && entry.payload.__undoCompensation) continue;
+      target = i;
+      break;
+    }
+    if (target < 0) return false;
+    const entry = this.history[target];
+    this.history.splice(target, 1);
+    if (entry.op === 'create') {
+      await this.commit(entry.entity, entry.entityId, 'delete',
+        { before: entry.payload.after, __undoCompensation: true });
+    } else if (entry.op === 'update') {
+      await this.commit(entry.entity, entry.entityId, 'update',
+        { before: entry.payload.after, after: entry.payload.before, __undoCompensation: true });
+    } else {
+      await this.commit(entry.entity, entry.entityId, 'create',
+        { after: entry.payload.before, __undoCompensation: true });
+    }
+    await this.saveSnapshot();
+    return true;
+  }
+}
+
+window.Store = { PlanStore, MemoryAdapter, FileAdapter };
+
+</script>
+<script>
+/**
+ * 达标要求（Checklist）的智能合并 —— 纯函数，供 UI / 同步 / 手机端复用。
+ *
+ * 合并规则（对应用户需求"更新或补充计划要求"）：
+ * 1. 去重：与新条目文本相同（忽略空白与大小写）的已有条目 → 跳过不重复添加；
+ * 2. 补充：已有条目里没有的 → 自动追加；
+ * 3. 变动更新：同 key（同一来源，如同一链接/同一文件名）但文本已变化的 → 就地更新文本并重置完成状态；
+ * 4. 手动条目不受影响：没有 key 的旧条目只按文本去重，永远不会被自动改写。
+ */
+
+/** 文本规范化：去空白、转小写，用于重复判定 */
+function normText(s        )         {
+  return s.replace(/\s+/g, '').toLowerCase();
+}
+
+                              
+                            
+                             
+                               
+                               
+ 
+
+/** 宽松类型（避免与 UI 层耦合） */
+                                    
+             
+               
+                
+                  
+               
+ 
+
+function mergeChecklist(
+  existing                                 ,
+  incoming                     ,
+)              {
+  const list                      = [...(existing || [])];
+  let added = 0, updated = 0, skipped = 0;
+
+  for (const item of incoming) {
+    const nText = normText(item.text);
+    const isDup = list.some((c) => normText(c.text) === nText);
+    if (isDup) { skipped++; continue; }
+
+    if (item.key) {
+      const idx = list.findIndex((c) => c.key && c.key === item.key);
+      if (idx >= 0) {
+        // 同一来源且文本有变化 → 更新文本，重置完成状态（内容变了需重做）
+        list[idx] = { ...list[idx], text: item.text, done: false, doneAt: undefined };
+        updated++;
+        continue;
+      }
+    }
+    list.push({ ...item });
+    added++;
+  }
+  return { list, added, updated, skipped };
+}
+
+window.Checklist = { mergeChecklist };
+
+</script>
+<script>
+/* 桌面计划小人 v0.1 界面逻辑（纯 JS，无依赖）
+ * v0.1.5 新增：多通道录入（一句话/图片/链接）、达标清单（逐条打勾）、计划关联文件夹 */
+(function () {
+  'use strict';
+  const Engine = window.Engine;
+  const Store = window.Store;
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function nowMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+  /** HTML 转义：所有用户输入内容插入 DOM 前必须经过这里 */
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致；经 LS 安全读写）----
+  class LocalStorageAdapter {
+    constructor(key) { this.key = key; }
+    log() {
+      try { return JSON.parse(LS.get(this.key + '.log') || '[]'); }
+      catch (e) { return []; }
+    }
+    appendEntry(e) {
+      const a = this.log();
+      a.push(e);
+      LS.set(this.key + '.log', JSON.stringify(a));
+    }
+    readEntries() { return this.log(); }
+    saveSnapshot(s) { LS.set(this.key + '.snap', JSON.stringify(s)); }
+    loadSnapshot() {
+      try { return JSON.parse(LS.get(this.key + '.snap') || 'null'); }
+      catch (e) { return null; }
+    }
+  }
+
+  const CATEGORY_COLORS = {
+    学习: '#7c9cf5', 英语: '#f5a97c', 健身: '#7cd6a0', 阅读: '#c47cf5',
+    刷题: '#f5d47c', 报告: '#7cc4f5', 其他: '#b0b7c3',
+  };
+  const colorOf = (c) => CATEGORY_COLORS[c] || CATEGORY_COLORS['其他'];
+
+  const ENERGY_PRESETS = {
+    early: [1,1,1,1,1,1,2,3,4,5,5,4,4,3,3,3,3,2,2,2,1,1,1,1],
+    night: [1,1,1,1,2,2,2,2,3,3,3,3,3,3,3,4,4,4,5,5,5,4,3,2],
+    flat: new Array(24).fill(3),
+  };
+
+  const store = new Store.PlanStore(new LocalStorageAdapter('plan-pal'), 'browser');
+  let blocks = [];
+
+  // ---- 安全存储：预览沙盒/隐私模式下 localStorage 可能被禁用（访问即抛错），
+  //      统一经 LS 读写，不可用时自动降级为内存存储（本次会话数据不持久化）----
+  const LS_MEM = {};
+  const LS = {
+    ok: (() => {
+      try { localStorage.setItem('__plan_pal_test', '1'); localStorage.removeItem('__plan_pal_test'); return true; }
+      catch (e) { return false; }
+    })(),
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return k in LS_MEM ? LS_MEM[k] : null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { LS_MEM[k] = v; } },
+    remove(k) { try { localStorage.removeItem(k); } catch (e) { delete LS_MEM[k]; } },
+  };
+  if (!LS.ok) {
+    window.addEventListener('DOMContentLoaded', () => {
+      const b = $('pet-bubble');
+      if (b) b.textContent = '⚠️ 当前环境不支持本地存储，数据仅本次会话有效（双击本地文件打开即可持久化）';
+    });
+  }
+  // ---- 可见错误横幅：任何脚本错误都显示在页面顶部，避免"静默失灵"----
+  window.onerror = (msg, src, line) => {
+    let el = document.getElementById('err-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'err-banner';
+      document.body.prepend(el);
+    }
+    el.textContent = `⚠️ 页面脚本错误：${msg}（第 ${line || '?'} 行）`;
+    return false;
+  };
+
+  // ---- 一句话解析（规则版；LLM 双路由在 v0.2 接入）----
+  function parseQuick(text) {
+    const t = text.trim();
+    const mh = /(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?/.exec(t);
+    const mm = /(\d+)\s*分钟/.exec(t);
+    let minutes = 60;
+    if (mh) minutes = Math.round(parseFloat(mh[1]) * 60 + (mh[2] ? 30 : 0));
+    else if (mm) minutes = parseInt(mm[1], 10);
+
+    const base = new Date();
+    const at = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T22:00`;
+    let deadline = null;
+    const iso = /(\d{4}-\d{2}-\d{2})/.exec(t);
+    const md = /(\d{1,2})月(\d{1,2})[日号]/.exec(t);
+    const rel = /(今天|明天|后天)/.exec(t);
+    const wk = /(?:周|星期)([一二三四五六日天])/.exec(t);
+    if (iso) deadline = iso[1] + 'T22:00';
+    else if (md) deadline = at(new Date(base.getFullYear(), +md[1] - 1, +md[2]));
+    else if (rel) {
+      const off = { 今天: 0, 明天: 1, 后天: 2 }[rel[1]];
+      deadline = at(new Date(base.getTime() + off * 86400000));
+    } else if (wk) {
+      const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+      let diff = (map[wk[1]] - base.getDay() + 7) % 7;
+      if (diff === 0) diff = 7;
+      deadline = at(new Date(base.getTime() + diff * 86400000));
+    }
+
+    const catMap = [['单词', '英语'], ['英语', '英语'], ['健身', '健身'], ['运动', '健身'],
+      ['刷题', '刷题'], ['习题', '刷题'], ['作业', '刷题'], ['阅读', '阅读'],
+      ['读书', '阅读'], ['实验', '报告'], ['报告', '报告'], ['复习', '学习']];
+    let category = '学习';
+    for (const [k, v] of catMap) { if (t.includes(k)) { category = v; break; } }
+
+    const title = t
+      .replace(/(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?|(\d+)\s*分钟/g, '')
+      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})之?前?(完成|搞定|结束)/g, '')
+      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})/g, '')
+      .trim() || '新计划';
+
+    return {
+      title, category, estimatedMinutes: minutes,
+      priority: /紧急|尽快|ASAP/.test(t) ? 5 : 3,
+      splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
+      deadline,
+    };
+  }
+
+  // ---- 链接识别（本地规则版）----
+  const SITE_MAP = [
+    [/bilibili\.com|b23\.tv/, 'B站视频', '学习'],
+    [/github\.com/, 'GitHub 仓库', '学习'],
+    [/docs\.qq\.com/, '腾讯文档', '报告'],
+    [/mp\.weixin\.qq\.com/, '微信公众号文章', '阅读'],
+    [/zhihu\.com/, '知乎', '阅读'],
+    ['icourse163.org', '慕课网课', '学习'],
+    ['xuetangx.com', '学堂在线', '学习'],
+    ['chaoxing.com', '超星学习通', '学习'],
+    ['arxiv.org', 'arXiv 论文', '学习'],
+    ['cnki.net', '知网文献', '学习'],
+    ['edu.cn', '教务/学校页面', '其他'],
+  ];
+  function parseLink(raw) {
+    let u;
+    try { u = new URL(/^https?:\/\//i.test(raw) ? raw.trim() : 'https://' + raw.trim()); }
+    catch (e) { return null; }
+    let site = '网页', cat = '学习';
+    for (const [pat, name, c] of SITE_MAP) {
+      const hit = pat instanceof RegExp ? pat.test(u.hostname) : u.hostname.includes(pat);
+      if (hit) { site = name; cat = c; break; }
+    }
+    // 标题建议：取路径最后一段有意义的内容（支持中文 slug）
+    let slug = '';
+    const segs = u.pathname.split('/').filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const s = decodeURIComponent(segs[i]);
+      if (/[\u4e00-\u9fa5A-Za-z]{2,}/.test(s) && !/^(index|html?|main)$/i.test(s)) { slug = s; break; }
+    }
+    if (!slug && u.searchParams.get('title')) slug = u.searchParams.get('title');
+    const title = slug ? `${site}：${slug}` : site;
+    return { url: u.href, site, title, category: cat };
+  }
+
+  // ---- 达标要求自动解析（规则版；LLM 双路由在 v0.2 接入）----
+  // 备注/文本按「、；;换行/然后」拆分为多条达标要求，剔除时长词
+  function splitSteps(text) {
+    return (text || '')
+      .split(/[、；;\n]+|然后|接着/)
+      .map((s) => s.replace(/\d+(?:\.\d+)?\s*(?:个)?小时(半)?|\d+\s*分钟/g, '').trim())
+      .filter((s) => s.length >= 2);
+  }
+  function genChecklistFromEntry({ note, fileNames, links, title }) {
+    const items = [];
+    for (const s of splitSteps(note)) items.push({ key: 'note', text: s });
+    for (const n of fileNames || []) items.push({ key: 'img:' + n, text: `处理图片资料：${n}` });
+    for (const l of links || []) {
+      items.push({ key: 'link:main:' + l, text: `查看/学习完链接内容：${l}` });
+      items.push({ key: 'link:note:' + l, text: '整理该链接内容的要点或笔记' });
+    }
+    if (!items.length && title) items.push({ key: 'auto', text: `完成「${title}」` });
+    return items.map((it) => ({ id: ckId(), text: it.text, done: false, key: it.key }));
+  }
+
+  // ---- 计划提交：新建，或智能合并进已有计划（重复不加/缺的补/同源变动更新）----
+  const normTitle = (s) => (s || '').replace(/\s+/g, '');
+  async function submitPlan(pane, base, extras) {
+    // pane: 'img' | 'link'；base: {title, category, minutes, priority, deadline}
+    // extras: { images, linkUrls, checklist, source }
+    const sel = $(pane + '-target');
+    const targetId = sel ? sel.value : 'new';
+    if (targetId !== 'new') {
+      const t = store.getTask(targetId);
+      if (!t) return null;
+      const r = Checklist.mergeChecklist(t.checklist, extras.checklist);
+      await store.updateTask(targetId, {
+        checklist: r.list,
+        images: [...(t.images || []), ...(extras.images || [])].slice(0, 12),
+        linkUrls: [...(t.linkUrls || []), ...(extras.linkUrls || [])]
+          .filter((u, i, a) => a.indexOf(u) === i),
+      });
+      return { merged: t.title, added: r.added, updated: r.updated, skipped: r.skipped };
+    }
+    const images = extras.images || [];
+    const created = await store.addTask({
+      title: base.title, category: base.category || '学习',
+      estimatedMinutes: base.minutes, priority: base.priority ?? 3,
+      splittable: base.minutes >= 50, minBlockMinutes: Math.min(25, base.minutes),
+      deadline: base.deadline || null,
+      source: extras.source, folderPath: null,
+      checklist: extras.checklist,
+      ...(images.length ? { images } : {}),
+      ...(extras.linkUrls && extras.linkUrls.length
+        ? { linkUrls: extras.linkUrls, linkUrl: extras.linkUrls[0] } : {}),
+    });
+    return { created: created.title, added: extras.checklist.length, updated: 0, skipped: 0 };
+  }
+  function fmtResult(res) {
+    if (!res) return '⚠️ 目标计划不存在';
+    if (res.merged) {
+      return `已并入「${res.merged}」：新增 ${res.added} 条、更新 ${res.updated} 条、跳过重复 ${res.skipped} 条达标要求`;
+    }
+    return `已新建计划「${res.created}」，自动生成 ${res.added} 条达标要求`;
+  }
+
+  // ---- 目标计划下拉：新建 or 合并到已有计划 ----
+  function populateTargetSelects() {
+    for (const pane of ['img', 'link']) {
+      const sel = $(pane + '-target');
+      if (!sel) continue;
+      const prev = sel.value;
+      const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+      sel.innerHTML = '<option value="new">➕ 新建计划</option>' +
+        tasks.map((t) => `<option value="${t.id}">并入：${esc(t.title)}</option>`).join('');
+      // 尽量保持用户上一次的选择
+      if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+    }
+  }
+
+  // ---- 图片 OCR 文字识别（Tesseract.js 中文，按需从 CDN 加载；失败自动降级）----
+  let ocrScriptLoading = false;
+  function ensureTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (ocrScriptLoading) return Promise.resolve(null);
+    ocrScriptLoading = true;
+    return new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      const done = (t) => { ocrScriptLoading = false; resolve(t); };
+      s.onload = () => done(window.Tesseract || null);
+      s.onerror = () => done(null);
+      document.head.appendChild(s);
+      setTimeout(() => done(window.Tesseract || null), 20000);
+    });
+  }
+  async function ocrPendingImages() {
+    if (!pendingImages.length) return;
+    const T = await ensureTesseract();
+    if (!T) {
+      $('img-feedback').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时），已按文件名生成达标要求';
+      return;
+    }
+    try {
+      const linesAll = [];
+      for (let i = 0; i < pendingImages.length; i++) {
+        $('img-feedback').textContent = `🔍 正在识别第 ${i + 1}/${pendingImages.length} 张图片的文字（首次需下载中文模型，请稍候）…`;
+        const r = await T.recognize(pendingImages[i].ocrUrl || pendingImages[i].dataUrl, 'chi_sim+eng');
+        const lines = (r.data.text || '').split(/\n+/)
+          .map((s) => s.replace(/\s+/g, ' ').trim())
+          .filter((s) => s.length >= 2 && !/^[\s\d\p{P}]*$/u.test(s));
+        linesAll.push(...lines);
+      }
+      if (linesAll.length) {
+        // 识别行并入备注（保留用户已填内容，去重）
+        const userLines = splitSteps($('img-note').value);
+        const merged = [...new Set([...userLines, ...linesAll])].join('、');
+        $('img-note').value = merged;
+        $('img-feedback').textContent = `✓ 已从图片识别出 ${linesAll.length} 行文字并并入达标要求来源（备注栏可编辑）`;
+      } else {
+        $('img-feedback').textContent = '⚠️ 图片中未识别出有效文字，已按文件名生成达标要求';
+      }
+    } catch (e) {
+      $('img-feedback').textContent = '⚠️ 文字识别失败（' + (e.message || '未知错误') + '），已按文件名生成达标要求';
+    }
+  }
+
+  // ---- 图片录入（多张；本地规则版：压缩预览 + 文件名/备注/OCR 识别）----
+  function compressImage(file, maxW = 480, quality = 0.6) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const dataUrl = c.toDataURL('image/jpeg', quality);
+        // OCR 用更高分辨率版本（不持久化，仅内存）
+        let ocrUrl = dataUrl;
+        if (img.width > maxW) {
+          const s2 = Math.min(1, 1200 / img.width);
+          const c2 = document.createElement('canvas');
+          c2.width = Math.round(img.width * s2);
+          c2.height = Math.round(img.height * s2);
+          c2.getContext('2d').drawImage(img, 0, 0, c2.width, c2.height);
+          ocrUrl = c2.toDataURL('image/jpeg', 0.85);
+        }
+        URL.revokeObjectURL(url);
+        resolve({ name: file.name.replace(/\.[a-z0-9]+$/i, '') || '图片', dataUrl, ocrUrl });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+      img.src = url;
+    });
+  }
+  let pendingImages = []; // { name, dataUrl, ocrUrl }
+  function renderImgThumbs() {
+    $('img-thumbs').innerHTML = pendingImages.map((im, i) => `
+      <span class="img-chip"><img src="${im.dataUrl}" alt="${esc(im.name)}">
+        <button class="chip-x" data-img-x="${i}" title="移除">×</button></span>`).join('');
+    $('img-confirm').classList.toggle('hidden', pendingImages.length === 0);
+    if (pendingImages.length && !$('img-title').value) {
+      $('img-title').value = pendingImages.length === 1 ? pendingImages[0].name : `图片计划（${pendingImages.length} 张）`;
+    }
+  }
+  async function acceptImageFiles(fileList) {
+    const files = [...fileList].filter((f) => f.type.startsWith('image/')).slice(0, 12);
+    if (!files.length) return;
+    for (const f of files) {
+      try { pendingImages.push(await compressImage(f)); } catch (e) { alert(e.message); }
+    }
+    renderImgThumbs();
+    $('img-feedback').textContent = '🔍 准备识别图片文字…';
+    ocrPendingImages(); // 自动解析图片内容 → 并入备注 → 提交时生成达标要求
+  }
+  async function addImageTask() {
+    if (!pendingImages.length) return;
+    const note = $('img-note').value.trim();
+    const parsed = parseQuick(note || $('img-title').value);
+    const minutes = parseInt($('img-min').value, 10) || parsed.estimatedMinutes;
+    const checklist = genChecklistFromEntry({
+      note, title: $('img-title').value.trim() || '图片计划',
+      fileNames: pendingImages.map((im) => im.name),
+    });
+    const res = await submitPlan('img', {
+      title: $('img-title').value.trim() || '图片计划',
+      category: $('img-cat').value.trim() || parsed.category,
+      minutes,
+    }, { images: pendingImages, checklist, source: 'image' });
+    $('img-feedback').textContent = res ? fmtResult(res) : '⚠️ 目标计划不存在';
+    if (res) {
+      pendingImages = [];
+      $('img-note').value = '';
+      $('img-title').value = '';
+      $('img-file').value = '';
+      renderImgThumbs();
+      renderTasks(); reschedule();
+    }
+  }
+
+  // ---- 链接录入（多条）----
+  let pendingLinks = []; // parseLink() 结果数组
+  function renderLinkList() {
+    $('link-list').innerHTML = pendingLinks.map((r, i) => `
+      <div class="link-chip">🔗 ${esc(r.site)}：${esc(r.title)}
+        <button class="chip-x" data-link-x="${i}" title="移除">×</button></div>`).join('');
+    $('link-confirm').classList.toggle('hidden', pendingLinks.length === 0);
+    if (pendingLinks.length && !$('link-title').value) {
+      $('link-title').value = pendingLinks.length === 1
+        ? pendingLinks[0].title
+        : `链接计划（${pendingLinks.length} 条）`;
+    }
+  }
+  function parseLinkInput() {
+    const parts = $('link-input').value.split(/[\s\n]+/).filter(Boolean);
+    if (!parts.length) { $('link-preview').textContent = '⚠️ 请先粘贴链接'; return; }
+    const ok = [], bad = [];
+    for (const p of parts) {
+      const r = parseLink(p);
+      if (r) ok.push(r); else bad.push(p);
+    }
+    pendingLinks = [...pendingLinks, ...ok.filter((r) => !pendingLinks.some((x) => x.url === r.url))];
+    $('link-preview').textContent = bad.length
+      ? `⚠️ 无法识别：${bad.join('、')}` : `✓ 已识别 ${ok.length} 条链接`;
+    renderLinkList();
+    populateTargetSelects();
+  }
+  async function addLinkTask() {
+    if (!pendingLinks.length) return;
+    const note = $('link-note').value.trim();
+    const parsed = parseQuick(note || $('link-title').value);
+    const minutes = parseInt($('link-min').value, 10) || 60;
+    const urls = pendingLinks.map((r) => r.url);
+    const checklist = genChecklistFromEntry({ note, links: urls });
+    const res = await submitPlan('link', {
+      title: $('link-title').value.trim() || '链接计划',
+      category: $('link-cat').value.trim() || pendingLinks[0].category,
+      minutes,
+    }, { linkUrls: urls, checklist, source: 'link' });
+    $('link-preview').textContent = res ? fmtResult(res) : '⚠️ 目标计划不存在';
+    if (res) {
+      pendingLinks = [];
+      $('link-input').value = '';
+      $('link-note').value = '';
+      $('link-title').value = '';
+      renderLinkList();
+      renderTasks(); reschedule();
+    }
+  }
+
+  // ---- 达标清单 ----
+  const ckId = () => 'ck-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  function ckStats(t) {
+    const list = t.checklist || [];
+    return { total: list.length, done: list.filter((c) => c.done).length };
+  }
+  async function addCheckItem(tid, text) {
+    const t = store.getTask(tid);
+    if (!t || !text.trim()) return;
+    const list = [...(t.checklist || []), { id: ckId(), text: text.trim(), done: false }];
+    await store.updateTask(tid, { checklist: list });
+    renderTasks();
+  }
+  async function toggleCheck(tid, ckid, checked) {
+    const t = store.getTask(tid);
+    if (!t) return;
+    const wasDone = t.status === 'done';
+    const list = (t.checklist || []).map((c) => c.id === ckid
+      ? { ...c, done: checked, doneAt: checked ? new Date().toISOString() : undefined } : c);
+    await store.updateTask(tid, { checklist: list }); // 达标自动完成/回退规则在数据层统一生效
+    const nowDone = store.getTask(tid)?.status === 'done';
+    renderTasks();
+    if (wasDone !== nowDone) reschedule(); // 完成状态变化后腾出/释放时间，重排剩余计划
+  }
+
+  // ---- 文件夹 ----
+  async function saveFolder(tid) {
+    const input = document.querySelector(`input[data-folder="${tid}"]`);
+    if (!input) return;
+    await store.updateTask(tid, { folderPath: input.value.trim() || undefined });
+    renderTasks();
+  }
+  async function copyFolder(tid) {
+    const t = store.getTask(tid);
+    if (!t || !t.folderPath) return;
+    try { await navigator.clipboard.writeText(t.folderPath); } catch (e) { /* 忽略 */ }
+  }
+
+  // ---- 排程 ----
+  function reschedule() {
+    const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+    const day = todayStr();
+    const r = Engine.greedySchedule(
+      tasks, store.listFixedEvents(), store.getIntensity(),
+      day + 'T00:00', day + 'T24:00',
+    );
+    blocks = r.blocks;
+    LS.set('plan-pal.blocks', JSON.stringify(blocks));
+    renderTimeline();
+    renderWarnings(r.capacityWarnings);
+    updatePet();
+  }
+
+  function renderWarnings(list) {
+    $('warnings').innerHTML = (list || []).map((w) =>
+      `<div class="warning">⚠️ ${esc(w.message)}</div>`).join('');
+  }
+
+  // ---- 时间轴渲染（07:00-24:00）----
+  const PXH = 44; // 每小时像素
+  function renderTimeline() {
+    const tl = $('timeline');
+    const dayStart = 7 * 60, dayEnd = 24 * 60;
+    tl.style.height = ((dayEnd - dayStart) / 60) * PXH + 'px';
+    let html = '';
+    for (let h = 7; h <= 23; h++) {
+      const top = ((h * 60 - dayStart) / 60) * PXH;
+      html += `<div class="hour-line" style="top:${top}px"><span>${pad(h)}:00</span></div>`;
+    }
+    const events = store.listFixedEvents();
+    const day = todayStr();
+    for (const ev of events) {
+      if (!Engine.occursOn(ev, day)) continue;
+      const s = ev.startTime.split(':').map(Number);
+      const e = ev.endTime === '24:00' ? [24, 0] : ev.endTime.split(':').map(Number);
+      const sm = s[0] * 60 + s[1], em = e[0] * 60 + e[1];
+      if (em <= dayStart || sm >= dayEnd) continue;
+      const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
+      const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
+      html += `<div class="block fixed" style="top:${top}px;height:${h}px" title="${esc(ev.title)}">
+        <span class="b-title">🔒 ${esc(ev.title)}</span></div>`;
+    }
+    for (const b of blocks) {
+      const sm = Engine.toMin(b.start) && new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes();
+      const em = new Date(b.end).getHours() * 60 + new Date(b.end).getMinutes();
+      if (em <= dayStart || sm >= dayEnd) continue;
+      const task = b.taskId ? store.getTask(b.taskId) : null;
+      const label = b.type === 'break' ? '☕ 休息' : (task ? task.title : '计划');
+      const color = b.type === 'break' ? '#86efac' : (task ? colorOf(task.category) : '#b0b7c3');
+      const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
+      const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
+      html += `<div class="block ${b.type}" style="top:${top}px;height:${h - 2}px;background:${color}" title="${esc(label)}">
+        <span class="b-title">${esc(label)} · ${b.start.slice(11)}-${b.end.slice(11)}</span></div>`;
+    }
+    const nm = nowMinutes();
+    if (nm > dayStart && nm < dayEnd) {
+      html += `<div class="now-line" style="top:${(nm - dayStart) / 60 * PXH}px"></div>`;
+    }
+    tl.innerHTML = html;
+    $('today-label').textContent = `（${day} 周${'日一二三四五六'[new Date().getDay()]}）`;
+  }
+
+  // ---- 任务列表（含达标清单 + 文件夹 + 附件详情）----
+  function renderTasks() {
+    populateTargetSelects();
+    const tasks = store.listTasks();
+    $('task-list').innerHTML = tasks.map((t) => {
+      const ck = ckStats(t);
+      const imgCount = (t.images || []).length + (t.imageUrl ? 1 : 0);
+      const linkCount = (t.linkUrls || []).length || (t.linkUrl ? 1 : 0);
+      const badges = [
+        imgCount ? `<span class="badge" title="附有图片资料">🖼️ ×${imgCount}</span>` : '',
+        linkCount ? `<span class="badge" title="附有链接">🔗 ×${linkCount}</span>` : '',
+        t.folderPath ? '<span class="badge" title="已关联资料文件夹">📁</span>' : '',
+        ck.total ? `<span class="badge ck-badge" title="达标进度">${ck.done}/${ck.total}</span>` : '',
+      ].join('');
+      const ckHtml = (t.checklist || []).map((c) => `
+        <label class="ck-item ${c.done ? 'ck-done' : ''}">
+          <input type="checkbox" data-act="ck-toggle" data-tid="${t.id}" data-ckid="${c.id}" ${c.done ? 'checked' : ''}>
+          <span>${esc(c.text)}</span>
+        </label>`).join('');
+      return `
+      <li class="${t.status === 'done' ? 'done' : ''}">
+        <div class="t-main">
+          <span class="dot" style="background:${colorOf(t.category)}"></span>
+          <b>${esc(t.title)}</b>${badges}
+          <span class="meta">${esc(t.category)} · ${t.estimatedMinutes}分钟 · 优先级${t.priority}${t.deadline ? ' · DDL ' + esc(t.deadline.replace('T', ' ')) : ''}</span>
+          <span class="ops">
+            <button data-act="done" data-id="${t.id}" title="完成">✔</button>
+            <button data-act="del" data-id="${t.id}" title="删除">✕</button>
+          </span>
+        </div>
+        <details class="t-detail">
+          <summary>达标要求 & 资料</summary>
+          <div class="ck-box">
+            ${ckHtml || '<p class="hint">还没有达标要求，添加后逐条打勾，全部完成即自动达标 ✔</p>'}
+            <div class="row ck-add-row">
+              <input data-ck-input="${t.id}" placeholder="添加达标要求，如：完成第3章习题并自查" style="flex:1;min-width:180px">
+              <button data-act="ck-add" data-id="${t.id}">➕ 加一条</button>
+            </div>
+          </div>
+          <div class="folder-box row">
+            <span title="该任务产出的文件统一放这里">📁</span>
+            <input data-folder="${t.id}" placeholder="资料文件夹路径，如 C:\\Users\\你\\Desktop\\高数作业" value="${esc(t.folderPath || '')}" style="flex:1;min-width:180px">
+            <button data-act="folder-save" data-id="${t.id}" title="保存路径">保存</button>
+            <button data-act="folder-copy" data-id="${t.id}" title="复制路径">📋</button>
+            ${window.__TAURI__ ? `<button data-act="folder-open" data-id="${t.id}" title="打开文件夹">📂</button>` : ''}
+          </div>
+          ${(t.linkUrls || []).length ? `<div class="attach-box">${(t.linkUrls || []).map((u) =>
+            `🔗 <a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join('<br>')}</div>`
+            : (t.linkUrl ? `<div class="attach-box">🔗 <a href="${esc(t.linkUrl)}" target="_blank" rel="noopener">${esc(t.linkUrl)}</a></div>` : '')}
+          ${imgCount ? '<div class="attach-box">🖼️ 已附图片资料（不在列表中展示大图，录入确认区可查看）</div>' : ''}
+        </details>
+      </li>`;
+    }).join('') || '<li class="empty">还没有计划，试试上方三种录入方式：一句话 / 图片 / 链接～</li>';
+  }
+
+  function renderEvents() {
+    const evs = store.listFixedEvents();
+    $('evt-list').innerHTML = evs.map((e) => `
+      <li><span class="dot" style="background:#94a3b8"></span>
+        <b>${esc(e.title)}</b>
+        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? '按周重复' : '仅一次'}</span>
+        <span class="ops"><button data-act="delevt" data-id="${e.id}" title="删除">✕</button></span>
+      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
+  }
+
+  // ---- 小人 ----
+  function updatePet() {
+    const pet = $('pet');
+    const bubble = $('pet-bubble');
+    const nm = nowMinutes();
+    const current = blocks.find((b) => {
+      const s = new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes();
+      const e = new Date(b.end).getHours() * 60 + new Date(b.end).getMinutes();
+      return s <= nm && nm < e;
+    });
+    if (current) {
+      const task = current.taskId ? store.getTask(current.taskId) : null;
+      const end = new Date(current.end).getHours() * 60 + new Date(current.end).getMinutes();
+      if (current.type === 'break') {
+        pet.firstChild.textContent = '🍵';
+        bubble.textContent = `休息中，还剩 ${end - nm} 分钟～`;
+      } else if (task && task.checklist && task.checklist.length) {
+        const ck = ckStats(task);
+        pet.firstChild.textContent = '🧑‍💻';
+        bubble.textContent = `正在做「${task.title}」，达标 ${ck.done}/${ck.total}，还剩 ${end - nm} 分钟！`;
+      } else {
+        pet.firstChild.textContent = '🧑‍💻';
+        bubble.textContent = `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`;
+      }
+      return;
+    }
+    const next = blocks
+      .filter((b) => new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes() > nm)
+      .sort((a, b) => a.start.localeCompare(b.start))[0];
+    pet.firstChild.textContent = '🚶';
+    bubble.textContent = next
+      ? `接下来 ${next.start.slice(11)}：${next.taskId && store.getTask(next.taskId) ? store.getTask(next.taskId).title : '计划'}`
+      : '今天的计划都完成啦，好好休息！';
+  }
+
+  // ---- 事件绑定 ----
+  function bindTabs() {
+    $('entry-tabs').onclick = (ev) => {
+      const tab = ev.target.closest('.tab');
+      if (!tab) return;
+      for (const b of $('entry-tabs').querySelectorAll('.tab')) b.classList.toggle('active', b === tab);
+      for (const pane of document.querySelectorAll('#panel-quick .tabpane')) {
+        pane.classList.toggle('hidden', pane.id !== 'pane-' + tab.dataset.tab);
+      }
+    };
+  }
+
+  // ---- 板块折叠导航：除计划列表外默认隐藏，单按钮展开/收起 ----
+  const COLLAPSIBLE = ['panel-quick', 'panel-events', 'panel-params', 'panel-timeline'];
+  function bindNav() {
+    $('panel-nav').onclick = (ev) => {
+      const b = ev.target.closest('.nav-btn');
+      if (!b) return;
+      const p = $(b.dataset.panel);
+      const show = p.classList.contains('hidden');
+      p.classList.toggle('hidden', !show);
+      b.classList.toggle('active', show);
+    };
+  }
+  function collapseAllPanels() {
+    for (const id of COLLAPSIBLE) $(id).classList.add('hidden');
+  }
+
+  function bind() {
+    bindTabs();
+    bindNav();
+    // 通道一：一句话（同名计划自动并入并完善达标要求）
+    $('quick-add').onclick = async () => {
+      const raw = $('quick-input').value;
+      const parsed = parseQuick(raw);
+      const target = store.listTasks().find((t) =>
+        t.status !== 'done' && t.status !== 'cancelled' && normTitle(t.title) === normTitle(parsed.title));
+      const checklist = genChecklistFromEntry({ note: raw, title: parsed.title });
+      if (target) {
+        const r = Checklist.mergeChecklist(target.checklist, checklist);
+        await store.updateTask(target.id, { checklist: r.list });
+        $('quick-preview').textContent = `→ 已并入已有计划「${target.title}」：新增 ${r.added}、更新 ${r.updated}、跳过重复 ${r.skipped} 条达标要求`;
+      } else {
+        $('quick-preview').textContent = `→ 「${parsed.title}」 ${parsed.category} ${parsed.estimatedMinutes}分钟 优先级${parsed.priority}${parsed.deadline ? ' DDL ' + parsed.deadline.replace('T', ' ') : ''} · 自动生成 ${checklist.length} 条达标要求`;
+        await store.addTask({ ...parsed, source: 'text', folderPath: null, checklist });
+      }
+      $('quick-input').value = '';
+      renderTasks();
+      reschedule();
+    };
+    // 手动表单添加（标题/类别/分钟/优先级/DDL）
+    $('task-add').onclick = async () => {
+      const title = $('task-title').value.trim();
+      if (!title) return;
+      const minutes = parseInt($('task-min').value, 10) || 60;
+      await store.addTask({
+        title,
+        category: $('task-cat').value.trim() || '其他',
+        estimatedMinutes: minutes,
+        priority: parseInt($('task-pri').value, 10) || 3,
+        splittable: minutes >= 50,
+        minBlockMinutes: Math.min(25, minutes),
+        deadline: $('task-ddl').value || null,
+        source: 'manual', folderPath: null,
+        checklist: [{ id: ckId(), text: `完成「${title}」`, done: false, key: 'auto' }],
+      });
+      $('task-title').value = '';
+      renderTasks();
+      reschedule();
+    };
+    // 通道二：图片（多选 / 多拖 / 多粘贴）
+    $('img-drop').onclick = () => $('img-file').click();
+    $('img-file').onchange = () => acceptImageFiles($('img-file').files);
+    $('img-drop').ondragover = (e) => { e.preventDefault(); $('img-drop').classList.add('dragging'); };
+    $('img-drop').ondragleave = () => $('img-drop').classList.remove('dragging');
+    $('img-drop').ondrop = (e) => {
+      e.preventDefault();
+      $('img-drop').classList.remove('dragging');
+      acceptImageFiles(e.dataTransfer.files);
+    };
+    // Ctrl+V 直接粘贴截图（可多张）
+    document.addEventListener('paste', (e) => {
+      if (!$('pane-image') || $('pane-image').classList.contains('hidden')) return;
+      const files = [...(e.clipboardData?.items || [])]
+        .filter((i) => i.type.startsWith('image/'))
+        .map((i) => i.getAsFile()).filter(Boolean);
+      if (files.length) acceptImageFiles(files);
+    });
+    $('img-add').onclick = addImageTask;
+    // 缩略图 / 链接条目的移除按钮
+    $('img-thumbs').onclick = (e) => {
+      const b = e.target.closest('button[data-img-x]');
+      if (!b) return;
+      pendingImages.splice(+b.dataset.imgX, 1);
+      renderImgThumbs();
+    };
+    $('link-list').onclick = (e) => {
+      const b = e.target.closest('button[data-link-x]');
+      if (!b) return;
+      pendingLinks.splice(+b.dataset.linkX, 1);
+      renderLinkList();
+    };
+    // 通道三：链接（多条）
+    $('link-parse').onclick = parseLinkInput;
+    $('link-input').onkeydown = (e) => { if (e.key === 'Enter') parseLinkInput(); };
+    $('link-add').onclick = addLinkTask;
+
+    // 计划列表：按钮点击 + 勾选 + 回车加达标项
+    $('task-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (btn.dataset.act === 'done') {
+        const t = store.getTask(id);
+        const ck = ckStats(t);
+        if (ck.total > 0 && ck.done < ck.total &&
+            !confirm(`「${t.title}」还有 ${ck.total - ck.done} 项达标要求未完成，确定直接标记完成？`)) return;
+        await store.updateTask(id, { status: 'done' });
+      } else if (btn.dataset.act === 'del') {
+        await store.deleteTask(id);
+      } else if (btn.dataset.act === 'ck-add') {
+        const input = document.querySelector(`input[data-ck-input="${id}"]`);
+        if (input) { await addCheckItem(id, input.value); }
+        return; // addCheckItem 内部已渲染
+      } else if (btn.dataset.act === 'folder-save') {
+        await saveFolder(id);
+        return;
+      } else if (btn.dataset.act === 'folder-copy') {
+        await copyFolder(id);
+        return;
+      } else if (btn.dataset.act === 'folder-open') {
+        // Tauri 桌面端：调用 rust 侧 open_folder 命令（v0.2 接入）；浏览器端降级为复制
+        await copyFolder(id);
+        return;
+      }
+      renderTasks();
+      reschedule();
+    };
+    $('task-list').onchange = (ev) => {
+      const cb = ev.target.closest('input[data-act="ck-toggle"]');
+      if (!cb) return;
+      toggleCheck(cb.dataset.tid, cb.dataset.ckid, cb.checked);
+    };
+    $('task-list').onkeydown = (ev) => {
+      const input = ev.target.closest('input[data-ck-input]');
+      if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
+    };
+    // 课表列表：删除按钮（✕）
+    $('evt-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn || btn.dataset.act !== 'delevt') return;
+      await store.removeFixedEvent(btn.dataset.id);
+      renderEvents();
+      reschedule();
+    };
+    $('evt-add').onclick = async () => {
+      const title = $('evt-title').value.trim();
+      if (!title) return;
+      await store.addFixedEvent({
+        title,
+        startTime: $('evt-start').value || '08:00',
+        endTime: $('evt-end').value || '09:40',
+        rrule: $('evt-freq').value === 'daily' ? 'FREQ=DAILY' : '',
+        effectiveFrom: todayStr(),
+      });
+      $('evt-title').value = '';
+      renderEvents();
+      reschedule();
+    };
+    $('evt-sample').onclick = async () => {
+      const have = (t) => store.listFixedEvents().some((e) => e.title === t);
+      const day = todayStr();
+      if (!have('睡眠')) await store.addFixedEvent({ title: '睡眠', startTime: '00:00', endTime: '07:00', rrule: 'FREQ=DAILY', effectiveFrom: '2026-11-01' });
+      if (!have('高数课')) await store.addFixedEvent({ title: '高数课', startTime: '08:00', endTime: '09:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      if (!have('专业课')) await store.addFixedEvent({ title: '专业课', startTime: '10:00', endTime: '11:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      if (!have('体育课')) await store.addFixedEvent({ title: '体育课', startTime: '14:00', endTime: '15:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      renderEvents();
+      reschedule();
+    };
+    $('btn-reschedule').onclick = reschedule;
+    $('btn-undo').onclick = async () => {
+      if (await store.undo()) { renderTasks(); renderEvents(); reschedule(); }
+    };
+    $('btn-export').onclick = () => {
+      const data = {
+        tasks: store.listTasks(), fixedEvents: store.listFixedEvents(),
+        intensity: store.getIntensity(), blocks,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `plan-pal-${todayStr()}.json`;
+      a.click();
+    };
+    $('btn-clear').onclick = () => {
+      if (!confirm('确定清空本机所有数据？（不可恢复）')) return;
+      LS.remove('plan-pal.log');
+      LS.remove('plan-pal.snap');
+      LS.remove('plan-pal.blocks');
+      location.reload();
+    };
+    // 强度参数：修改即保存并重排
+    const paramIds = [['p-load', 'dailyLoadCapMinutes'], ['p-bmax', 'blockMaxMinutes'],
+      ['p-bmin', 'blockMinMinutes'], ['p-break', 'minBreakMinutes'], ['p-chain', 'consecutiveWorkCapMinutes']];
+    for (const [id, key] of paramIds) {
+      $(id).onchange = async () => {
+        const p = store.getIntensity();
+        p[key] = parseInt($(id).value, 10) || p[key];
+        await store.setIntensity(p);
+        reschedule();
+      };
+    }
+    $('p-energy').onchange = async () => {
+      const p = store.getIntensity();
+      p.energyCurve = ENERGY_PRESETS[$('p-energy').value];
+      await store.setIntensity(p);
+      reschedule();
+    };
+  }
+
+  function fillParams() {
+    const p = store.getIntensity();
+    if (!p) return;
+    $('p-load').value = p.dailyLoadCapMinutes;
+    $('p-bmax').value = p.blockMaxMinutes;
+    $('p-bmin').value = p.blockMinMinutes;
+    $('p-break').value = p.minBreakMinutes;
+    $('p-chain').value = p.consecutiveWorkCapMinutes;
+  }
+
+  // ---- 启动 ----
+  (async function init() {
+    await store.open();
+    if (!store.getIntensity()) {
+      await store.setIntensity({
+        id: 'default', effectiveDate: todayStr(),
+        dailyLoadCapMinutes: 360, blockMaxMinutes: 90, blockMinMinutes: 25,
+        minBreakMinutes: 10, consecutiveWorkCapMinutes: 120,
+        energyCurve: ENERGY_PRESETS.early, categoryQuotas: {}, nudgeLevel: 2,
+      });
+    }
+    try { blocks = JSON.parse(LS.get('plan-pal.blocks') || '[]'); } catch (e) { blocks = []; }
+    collapseAllPanels(); // 极简模式：默认只显示计划列表
+    fillParams();
+    bind();
+    renderTasks();
+    renderEvents();
+    if (!blocks.length) reschedule(); else { renderTimeline(); renderWarnings([]); }
+    updatePet();
+    setInterval(updatePet, 15000);
+    setInterval(renderTimeline, 60000); // 刷新当前时间线
+  })();
+})();
+
+</script>
+<div id="selftest-out" style="position:fixed;top:0;left:0;z-index:99999;background:#ff0;color:#000;font-size:10px;white-space:pre-wrap;max-width:100%">pending</div>
+<script>
+(async () => {
+  const out = [];
+  const paint = () => { document.getElementById('selftest-out').textContent = 'SELFTEST\n' + out.join('\n'); };
+  const tryStep = async (name, fn) => {
+    try { await fn(); out.push(name + ': OK'); }
+    catch (e) { out.push(name + ': FAIL ' + ((e && e.message) || e)); }
+    paint();
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const $id = (i) => document.getElementById(i);
+  out.push('err-banner: ' + ($id('err-banner') ? ($id('err-banner').textContent || '(空)') : '(未创建)'));
+  paint();
+  await tryStep('导航展开加计划', async () => {
+    const btn = document.querySelector('#panel-nav button[data-panel="panel-quick"]');
+    if (!btn) throw new Error('导航按钮不存在');
+    btn.click(); await sleep(100);
+    if ($id('panel-quick').classList.contains('hidden')) throw new Error('面板未展开');
+  });
+  await tryStep('图片Tab', async () => {
+    const tab = document.querySelector('#entry-tabs .tab[data-tab="image"]');
+    if (!tab) throw new Error('Tab不存在');
+    tab.click(); await sleep(100);
+    if ($id('pane-image').classList.contains('hidden')) throw new Error('未切换');
+  });
+  await tryStep('链接Tab', async () => {
+    document.querySelector('#entry-tabs .tab[data-tab="link"]').click(); await sleep(100);
+    if ($id('pane-link').classList.contains('hidden')) throw new Error('未切换');
+  });
+  await tryStep('一句话添加', async () => {
+    document.querySelector('#entry-tabs .tab[data-tab="text"]').click();
+    $id('quick-input').value = '自测任务 30分钟';
+    $id('quick-add').click(); await sleep(600);
+    if (!$id('task-list').innerHTML.includes('自测任务')) throw new Error('列表未出现');
+  });
+  await tryStep('手动表单添加', async () => {
+    $id('task-title').value = '手动自测';
+    $id('task-add').click(); await sleep(600);
+    if (!$id('task-list').innerHTML.includes('手动自测')) throw new Error('列表未出现');
+  });
+  await tryStep('课表添加', async () => {
+    $id('panel-events').classList.remove('hidden');
+    $id('evt-title').value = '自测课';
+    $id('evt-add').click(); await sleep(500);
+    if (!$id('evt-list').innerHTML.includes('自测课')) throw new Error('课表未出现');
+  });
+  out.push('DONE');
+  paint();
+})();
+</script>
+</body>
+</html>
