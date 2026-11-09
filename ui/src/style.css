@@ -118,3 +118,20 @@ footer a { color: #6b7280; }
   background: #fef2f2; color: #b91c1c; border-bottom: 1px solid #fecaca;
   padding: 8px 24px; font-size: 13px;
 }
+.img-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.img-chip { position: relative; display: inline-block; }
+.img-chip img {
+  width: 84px; height: 64px; object-fit: cover; border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15); display: block;
+}
+.chip-x {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+  border-radius: 50%; background: #ef4444; color: #fff; font-size: 12px;
+  line-height: 18px; padding: 0; text-align: center;
+}
+.link-list { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.link-chip {
+  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  background: #f5f8ff; border: 1px solid #dbe4ff; border-radius: 6px; padding: 5px 8px;
+}
+.link-chip .chip-x { position: static; flex-shrink: 0; }

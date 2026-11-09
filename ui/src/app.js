@@ -170,8 +170,83 @@
     return { url: u.href, site, title, category: cat };
   }
 
-  // ---- 图片录入（本地规则版：压缩预览 + 文件名/备注识别；OCR 在 v0.2 接入）----
-  function compressImage(file, maxW = 640) {
+  // ---- 达标要求自动解析（规则版；LLM 双路由在 v0.2 接入）----
+  // 备注/文本按「、；;换行/然后」拆分为多条达标要求，剔除时长词
+  function splitSteps(text) {
+    return (text || '')
+      .split(/[、；;\n]+|然后|接着/)
+      .map((s) => s.replace(/\d+(?:\.\d+)?\s*(?:个)?小时(半)?|\d+\s*分钟/g, '').trim())
+      .filter((s) => s.length >= 2);
+  }
+  function genChecklistFromEntry({ note, fileNames, links, title }) {
+    const items = [];
+    for (const s of splitSteps(note)) items.push({ key: 'note', text: s });
+    for (const n of fileNames || []) items.push({ key: 'img:' + n, text: `处理图片资料：${n}` });
+    for (const l of links || []) {
+      items.push({ key: 'link:main:' + l, text: `查看/学习完链接内容：${l}` });
+      items.push({ key: 'link:note:' + l, text: '整理该链接内容的要点或笔记' });
+    }
+    if (!items.length && title) items.push({ key: 'auto', text: `完成「${title}」` });
+    return items.map((it) => ({ id: ckId(), text: it.text, done: false, key: it.key }));
+  }
+
+  // ---- 计划提交：新建，或智能合并进已有计划（重复不加/缺的补/同源变动更新）----
+  const normTitle = (s) => (s || '').replace(/\s+/g, '');
+  async function submitPlan(pane, base, extras) {
+    // pane: 'img' | 'link'；base: {title, category, minutes, priority, deadline}
+    // extras: { images, linkUrls, checklist, source }
+    const sel = $(pane + '-target');
+    const targetId = sel ? sel.value : 'new';
+    if (targetId !== 'new') {
+      const t = store.getTask(targetId);
+      if (!t) return null;
+      const r = Checklist.mergeChecklist(t.checklist, extras.checklist);
+      await store.updateTask(targetId, {
+        checklist: r.list,
+        images: [...(t.images || []), ...(extras.images || [])].slice(0, 12),
+        linkUrls: [...(t.linkUrls || []), ...(extras.linkUrls || [])]
+          .filter((u, i, a) => a.indexOf(u) === i),
+      });
+      return { merged: t.title, added: r.added, updated: r.updated, skipped: r.skipped };
+    }
+    const images = extras.images || [];
+    const created = await store.addTask({
+      title: base.title, category: base.category || '学习',
+      estimatedMinutes: base.minutes, priority: base.priority ?? 3,
+      splittable: base.minutes >= 50, minBlockMinutes: Math.min(25, base.minutes),
+      deadline: base.deadline || null,
+      source: extras.source, folderPath: null,
+      checklist: extras.checklist,
+      ...(images.length ? { images } : {}),
+      ...(extras.linkUrls && extras.linkUrls.length
+        ? { linkUrls: extras.linkUrls, linkUrl: extras.linkUrls[0] } : {}),
+    });
+    return { created: created.title, added: extras.checklist.length, updated: 0, skipped: 0 };
+  }
+  function fmtResult(res) {
+    if (!res) return '⚠️ 目标计划不存在';
+    if (res.merged) {
+      return `已并入「${res.merged}」：新增 ${res.added} 条、更新 ${res.updated} 条、跳过重复 ${res.skipped} 条达标要求`;
+    }
+    return `已新建计划「${res.created}」，自动生成 ${res.added} 条达标要求`;
+  }
+
+  // ---- 目标计划下拉：新建 or 合并到已有计划 ----
+  function populateTargetSelects() {
+    for (const pane of ['img', 'link']) {
+      const sel = $(pane + '-target');
+      if (!sel) continue;
+      const prev = sel.value;
+      const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+      sel.innerHTML = '<option value="new">➕ 新建计划</option>' +
+        tasks.map((t) => `<option value="${t.id}">并入：${esc(t.title)}</option>`).join('');
+      // 尽量保持用户上一次的选择
+      if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+    }
+  }
+
+  // ---- 图片录入（多张；本地规则版：压缩预览 + 文件名/备注识别；OCR 在 v0.2 接入）----
+  function compressImage(file, maxW = 480) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -182,76 +257,102 @@
         c.height = Math.round(img.height * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', 0.7));
+        resolve({ name: file.name.replace(/\.[a-z0-9]+$/i, '') || '图片', dataUrl: c.toDataURL('image/jpeg', 0.6) });
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
       img.src = url;
     });
   }
-  let pendingImage = null; // { dataUrl, name }
-  async function acceptImageFile(file) {
-    if (!file || !file.type.startsWith('image/')) return;
-    try {
-      const dataUrl = await compressImage(file);
-      pendingImage = { dataUrl, name: file.name.replace(/\.[a-z0-9]+$/i, '') };
-      $('img-thumb').src = dataUrl;
-      $('img-title').value = pendingImage.name || '';
-      $('img-confirm').classList.remove('hidden');
-    } catch (e) { alert(e.message); }
+  let pendingImages = []; // { name, dataUrl }
+  function renderImgThumbs() {
+    $('img-thumbs').innerHTML = pendingImages.map((im, i) => `
+      <span class="img-chip"><img src="${im.dataUrl}" alt="${esc(im.name)}">
+        <button class="chip-x" data-img-x="${i}" title="移除">×</button></span>`).join('');
+    $('img-confirm').classList.toggle('hidden', pendingImages.length === 0);
+    if (pendingImages.length && !$('img-title').value) {
+      $('img-title').value = pendingImages.length === 1 ? pendingImages[0].name : `图片计划（${pendingImages.length} 张）`;
+    }
   }
-  function addImageTask() {
-    if (!pendingImage) return;
+  async function acceptImageFiles(fileList) {
+    const files = [...fileList].filter((f) => f.type.startsWith('image/')).slice(0, 12);
+    for (const f of files) {
+      try { pendingImages.push(await compressImage(f)); } catch (e) { alert(e.message); }
+    }
+    renderImgThumbs();
+  }
+  async function addImageTask() {
+    if (!pendingImages.length) return;
     const note = $('img-note').value.trim();
-    const parsed = note ? parseQuick(note) : null;
-    const minutes = parseInt($('img-min').value, 10) || (parsed ? parsed.estimatedMinutes : 60);
-    store.addTask({
-      title: $('img-title').value.trim() || '图片计划',
-      category: parsed ? parsed.category : '其他',
-      estimatedMinutes: minutes,
-      priority: parsed ? parsed.priority : 3,
-      splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
-      deadline: parsed ? parsed.deadline : null,
-      source: 'image',
-      imageUrl: pendingImage.dataUrl,
-      folderPath: null, checklist: [],
-    }).then(() => {
-      pendingImage = null;
-      $('img-note').value = '';
-      $('img-confirm').classList.add('hidden');
-      $('img-thumb').src = '';
-      $('img-file').value = '';
-      renderTasks(); reschedule();
+    const parsed = parseQuick(note || $('img-title').value);
+    const minutes = parseInt($('img-min').value, 10) || parsed.estimatedMinutes;
+    const checklist = genChecklistFromEntry({
+      note, title: $('img-title').value.trim() || '图片计划',
+      fileNames: pendingImages.map((im) => im.name),
     });
+    const res = await submitPlan('img', {
+      title: $('img-title').value.trim() || '图片计划',
+      category: $('img-cat').value.trim() || parsed.category,
+      minutes,
+    }, { images: pendingImages, checklist, source: 'image' });
+    $('img-feedback').textContent = res ? fmtResult(res) : '⚠️ 目标计划不存在';
+    if (res) {
+      pendingImages = [];
+      $('img-note').value = '';
+      $('img-title').value = '';
+      $('img-file').value = '';
+      renderImgThumbs();
+      renderTasks(); reschedule();
+    }
   }
 
-  let pendingLink = null;
-  function parseLinkInput() {
-    const r = parseLink($('link-input').value);
-    if (!r) { $('link-preview').textContent = '⚠️ 无法识别该链接，请检查格式'; return; }
-    pendingLink = r;
-    $('link-preview').textContent = `→ 识别为「${r.site}」 建议类别：${r.category}`;
-    $('link-title').value = r.title;
-    $('link-cat').value = r.category;
-    $('link-confirm').classList.remove('hidden');
+  // ---- 链接录入（多条）----
+  let pendingLinks = []; // parseLink() 结果数组
+  function renderLinkList() {
+    $('link-list').innerHTML = pendingLinks.map((r, i) => `
+      <div class="link-chip">🔗 ${esc(r.site)}：${esc(r.title)}
+        <button class="chip-x" data-link-x="${i}" title="移除">×</button></div>`).join('');
+    $('link-confirm').classList.toggle('hidden', pendingLinks.length === 0);
+    if (pendingLinks.length && !$('link-title').value) {
+      $('link-title').value = pendingLinks.length === 1
+        ? pendingLinks[0].title
+        : `链接计划（${pendingLinks.length} 条）`;
+    }
   }
-  function addLinkTask() {
-    if (!pendingLink) return;
+  function parseLinkInput() {
+    const parts = $('link-input').value.split(/[\s\n]+/).filter(Boolean);
+    if (!parts.length) { $('link-preview').textContent = '⚠️ 请先粘贴链接'; return; }
+    const ok = [], bad = [];
+    for (const p of parts) {
+      const r = parseLink(p);
+      if (r) ok.push(r); else bad.push(p);
+    }
+    pendingLinks = [...pendingLinks, ...ok.filter((r) => !pendingLinks.some((x) => x.url === r.url))];
+    $('link-preview').textContent = bad.length
+      ? `⚠️ 无法识别：${bad.join('、')}` : `✓ 已识别 ${ok.length} 条链接`;
+    renderLinkList();
+    populateTargetSelects();
+  }
+  async function addLinkTask() {
+    if (!pendingLinks.length) return;
+    const note = $('link-note').value.trim();
+    const parsed = parseQuick(note || $('link-title').value);
     const minutes = parseInt($('link-min').value, 10) || 60;
-    store.addTask({
-      title: $('link-title').value.trim() || pendingLink.site,
-      category: $('link-cat').value.trim() || pendingLink.category,
-      estimatedMinutes: minutes,
-      priority: 3, splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
-      deadline: null,
-      source: 'link', linkUrl: pendingLink.url,
-      folderPath: null, checklist: [],
-    }).then(() => {
-      pendingLink = null;
+    const urls = pendingLinks.map((r) => r.url);
+    const checklist = genChecklistFromEntry({ note, links: urls });
+    const res = await submitPlan('link', {
+      title: $('link-title').value.trim() || '链接计划',
+      category: $('link-cat').value.trim() || pendingLinks[0].category,
+      minutes,
+    }, { linkUrls: urls, checklist, source: 'link' });
+    $('link-preview').textContent = res ? fmtResult(res) : '⚠️ 目标计划不存在';
+    if (res) {
+      pendingLinks = [];
       $('link-input').value = '';
-      $('link-preview').textContent = '';
-      $('link-confirm').classList.add('hidden');
+      $('link-note').value = '';
+      $('link-title').value = '';
+      renderLinkList();
       renderTasks(); reschedule();
-    });
+    }
   }
 
   // ---- 达标清单 ----
@@ -358,12 +459,15 @@
 
   // ---- 任务列表（含达标清单 + 文件夹 + 附件详情）----
   function renderTasks() {
+    populateTargetSelects();
     const tasks = store.listTasks();
     $('task-list').innerHTML = tasks.map((t) => {
       const ck = ckStats(t);
+      const imgCount = (t.images || []).length + (t.imageUrl ? 1 : 0);
+      const linkCount = (t.linkUrls || []).length || (t.linkUrl ? 1 : 0);
       const badges = [
-        t.source === 'image' && t.imageUrl ? '<span class="badge" title="来自图片录入">🖼️</span>' : '',
-        t.source === 'link' && t.linkUrl ? '<span class="badge" title="来自链接录入">🔗</span>' : '',
+        imgCount ? `<span class="badge" title="附有图片资料">🖼️ ×${imgCount}</span>` : '',
+        linkCount ? `<span class="badge" title="附有链接">🔗 ×${linkCount}</span>` : '',
         t.folderPath ? '<span class="badge" title="已关联资料文件夹">📁</span>' : '',
         ck.total ? `<span class="badge ck-badge" title="达标进度">${ck.done}/${ck.total}</span>` : '',
       ].join('');
@@ -399,8 +503,10 @@
             <button data-act="folder-copy" data-id="${t.id}" title="复制路径">📋</button>
             ${window.__TAURI__ ? `<button data-act="folder-open" data-id="${t.id}" title="打开文件夹">📂</button>` : ''}
           </div>
-          ${t.imageUrl ? `<div class="attach-box"><img src="${t.imageUrl}" alt="附件图片" class="attach-img"></div>` : ''}
-          ${t.linkUrl ? `<div class="attach-box">🔗 <a href="${esc(t.linkUrl)}" target="_blank" rel="noopener">${esc(t.linkUrl)}</a></div>` : ''}
+          ${(t.linkUrls || []).length ? `<div class="attach-box">${(t.linkUrls || []).map((u) =>
+            `🔗 <a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a>`).join('<br>')}</div>`
+            : (t.linkUrl ? `<div class="attach-box">🔗 <a href="${esc(t.linkUrl)}" target="_blank" rel="noopener">${esc(t.linkUrl)}</a></div>` : '')}
+          ${imgCount ? '<div class="attach-box">🖼️ 已附图片资料（不在列表中展示大图，录入确认区可查看）</div>' : ''}
         </details>
       </li>`;
     }).join('') || '<li class="empty">还没有计划，试试上方三种录入方式：一句话 / 图片 / 链接～</li>';
@@ -465,33 +571,58 @@
 
   function bind() {
     bindTabs();
-    // 通道一：一句话
+    // 通道一：一句话（同名计划自动并入并完善达标要求）
     $('quick-add').onclick = async () => {
-      const parsed = parseQuick($('quick-input').value);
-      $('quick-preview').textContent = `→ 「${parsed.title}」 ${parsed.category} ${parsed.estimatedMinutes}分钟 优先级${parsed.priority}${parsed.deadline ? ' DDL ' + parsed.deadline.replace('T', ' ') : ''}`;
-      await store.addTask({ ...parsed, source: 'text', folderPath: null, checklist: [] });
+      const raw = $('quick-input').value;
+      const parsed = parseQuick(raw);
+      const target = store.listTasks().find((t) =>
+        t.status !== 'done' && t.status !== 'cancelled' && normTitle(t.title) === normTitle(parsed.title));
+      const checklist = genChecklistFromEntry({ note: raw, title: parsed.title });
+      if (target) {
+        const r = Checklist.mergeChecklist(target.checklist, checklist);
+        await store.updateTask(target.id, { checklist: r.list });
+        $('quick-preview').textContent = `→ 已并入已有计划「${target.title}」：新增 ${r.added}、更新 ${r.updated}、跳过重复 ${r.skipped} 条达标要求`;
+      } else {
+        $('quick-preview').textContent = `→ 「${parsed.title}」 ${parsed.category} ${parsed.estimatedMinutes}分钟 优先级${parsed.priority}${parsed.deadline ? ' DDL ' + parsed.deadline.replace('T', ' ') : ''} · 自动生成 ${checklist.length} 条达标要求`;
+        await store.addTask({ ...parsed, source: 'text', folderPath: null, checklist });
+      }
       $('quick-input').value = '';
       renderTasks();
       reschedule();
     };
-    // 通道二：图片
+    // 通道二：图片（多选 / 多拖 / 多粘贴）
     $('img-drop').onclick = () => $('img-file').click();
-    $('img-file').onchange = () => acceptImageFile($('img-file').files[0]);
+    $('img-file').onchange = () => acceptImageFiles($('img-file').files);
     $('img-drop').ondragover = (e) => { e.preventDefault(); $('img-drop').classList.add('dragging'); };
     $('img-drop').ondragleave = () => $('img-drop').classList.remove('dragging');
     $('img-drop').ondrop = (e) => {
       e.preventDefault();
       $('img-drop').classList.remove('dragging');
-      acceptImageFile(e.dataTransfer.files[0]);
+      acceptImageFiles(e.dataTransfer.files);
     };
-    // Ctrl+V 直接粘贴截图
+    // Ctrl+V 直接粘贴截图（可多张）
     document.addEventListener('paste', (e) => {
       if (!$('pane-image') || $('pane-image').classList.contains('hidden')) return;
-      const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
-      if (item) acceptImageFile(item.getAsFile());
+      const files = [...(e.clipboardData?.items || [])]
+        .filter((i) => i.type.startsWith('image/'))
+        .map((i) => i.getAsFile()).filter(Boolean);
+      if (files.length) acceptImageFiles(files);
     });
     $('img-add').onclick = addImageTask;
-    // 通道三：链接
+    // 缩略图 / 链接条目的移除按钮
+    $('img-thumbs').onclick = (e) => {
+      const b = e.target.closest('button[data-img-x]');
+      if (!b) return;
+      pendingImages.splice(+b.dataset.imgX, 1);
+      renderImgThumbs();
+    };
+    $('link-list').onclick = (e) => {
+      const b = e.target.closest('button[data-link-x]');
+      if (!b) return;
+      pendingLinks.splice(+b.dataset.linkX, 1);
+      renderLinkList();
+    };
+    // 通道三：链接（多条）
     $('link-parse').onclick = parseLinkInput;
     $('link-input').onkeydown = (e) => { if (e.key === 'Enter') parseLinkInput(); };
     $('link-add').onclick = addLinkTask;

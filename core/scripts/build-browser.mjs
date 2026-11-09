@@ -33,6 +33,10 @@ const storeJs = toBrowserJs('core/src/store.ts', 'Store', [
   'PlanStore', 'MemoryAdapter', 'FileAdapter',
 ]);
 
+const checklistJs = toBrowserJs('core/src/checklist.ts', 'Checklist', [
+  'mergeChecklist',
+]);
+
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
 
@@ -74,34 +78,41 @@ ${css}
       <div id="quick-preview" class="preview"></div>
     </div>
     <div class="tabpane hidden" id="pane-image">
-      <div id="img-drop">点击选择 / 拖入图片 / Ctrl+V 粘贴截图（如课程表、作业要求）</div>
-      <input id="img-file" type="file" accept="image/*" hidden>
+      <div id="img-drop">点击选择 / 拖入图片（可多选）/ Ctrl+V 粘贴截图（如课程表、作业要求）</div>
+      <input id="img-file" type="file" accept="image/*" multiple hidden>
       <div id="img-confirm" class="hidden">
-        <div class="img-prev-wrap"><img id="img-thumb" alt="图片预览"></div>
+        <div id="img-thumbs" class="img-thumbs"></div>
         <div class="row form">
-          <input id="img-title" placeholder="标题（默认取文件名）" style="flex:1;min-width:160px">
-          <input id="img-min" type="number" value="60" title="预计分钟" style="max-width:80px">
-          <input id="img-note" placeholder="备注，可识别时长/DDL，如：复习第3章 2小时 周五前" style="flex:1;min-width:160px">
+          <select id="img-target" title="新建计划，或补充到已有计划"><option value="new">➕ 新建计划</option></select>
+          <input id="img-title" placeholder="计划名称（可自定义）" style="flex:1;min-width:150px">
+          <input id="img-cat" placeholder="类别" value="学习" style="max-width:80px">
+          <input id="img-min" type="number" value="60" title="预计分钟" style="max-width:70px">
           <button id="img-add">添加计划</button>
         </div>
+        <input id="img-note" placeholder="备注 / 达标要求：用「、」或「；」分隔多条，如：看完第一课、做课后习题、整理错题 2小时 周五前" style="width:100%">
+        <div id="img-feedback" class="preview"></div>
+        <p class="hint">达标要求自动解析：备注按「、；」拆分逐条生成，文件名/链接也会生成对应条目；自动合并进目标计划——重复不加、缺的补上、同来源变动的更新。</p>
       </div>
       <p class="hint">当前为本地规则版：自动取文件名 + 备注识别时长/DDL；图片内文字 OCR 识别将在 v0.2 接入。</p>
     </div>
     <div class="tabpane hidden" id="pane-link">
       <div class="row">
-        <input id="link-input" placeholder="粘贴链接：B站视频 / GitHub 仓库 / 在线文档 / 网课页面…" style="flex:1;min-width:220px">
+        <input id="link-input" placeholder="粘贴链接（可多条，空格或换行分隔）：B站视频 / GitHub / 在线文档 / 网课…" style="flex:1;min-width:220px">
         <button id="link-parse">识别</button>
       </div>
       <div id="link-confirm" class="hidden">
+        <div id="link-list" class="link-list"></div>
         <div class="row form">
-          <input id="link-title" placeholder="标题" style="flex:1;min-width:160px">
-          <input id="link-cat" placeholder="类别" value="学习" style="max-width:90px">
-          <input id="link-min" type="number" value="60" title="预计分钟" style="max-width:80px">
-          <input id="link-url-show" hidden>
+          <select id="link-target" title="新建计划，或补充到已有计划"><option value="new">➕ 新建计划</option></select>
+          <input id="link-title" placeholder="计划名称（可自定义）" style="flex:1;min-width:150px">
+          <input id="link-cat" placeholder="类别" value="学习" style="max-width:80px">
+          <input id="link-min" type="number" value="60" title="预计分钟" style="max-width:70px">
           <button id="link-add">添加计划</button>
         </div>
+        <input id="link-note" placeholder="备注 / 达标要求：用「、」或「；」分隔多条，如：看完视频、做笔记 1小时" style="width:100%">
+        <div id="link-preview" class="preview"></div>
+        <p class="hint">达标要求自动解析：每条链接生成「查看内容 + 整理要点」条目，备注拆分逐条生成；自动合并——重复不加、缺的补上、同链接变动的更新。</p>
       </div>
-      <div id="link-preview" class="preview"></div>
       <p class="hint">当前为本地规则识别（站点/标题建议）；联网抓取网页标题将在 v0.2 接入 LLM 双路由。</p>
     </div>
   </section>
@@ -161,6 +172,9 @@ ${engineJs}
 </script>
 <script>
 ${storeJs}
+</script>
+<script>
+${checklistJs}
 </script>
 <script>
 ${appJs}
