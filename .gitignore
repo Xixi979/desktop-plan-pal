@@ -1,0 +1,17 @@
+# node
+node_modules/
+dist/
+*.log
+
+# 环境与密钥
+.env
+.env.*
+*.key
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
