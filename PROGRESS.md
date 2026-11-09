@@ -21,6 +21,7 @@
   - 达标机制：Task.checklist 逐条打勾，全部达标自动 done / 取消任一条自动回退 scheduled（规则下沉到 store.updateTask，UI/同步/手机端一致生效）；勾完自动重排
   - 计划关联文件夹：Task.folderPath，详情内设置/保存/复制路径；Tauri 端预留 📂 打开按钮（window.__TAURI__ 探测）
   - 测试：store.test.ts 新增达标清单用例（6/6）；shim 增加 .not 断言与失败堆栈；DOM 插入统一 esc() 转义
+  - 修复（f71055a）：预览沙盒 iframe 禁用 localStorage → store.open() 保存快照抛错 → 初始化中断、全部按钮失灵；新增安全存储层 LS（不可用时降级内存）+ 顶部可见错误横幅；模拟禁用环境验证四入口全部绑定
 
 ## ⏭️ 下一步（按顺序）
 
