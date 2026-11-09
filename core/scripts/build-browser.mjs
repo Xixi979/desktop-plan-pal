@@ -41,6 +41,10 @@ const icsJs = toBrowserJs('core/src/ics.ts', 'Ics', [
   'parseIcs',
 ]);
 
+const nlpJs = toBrowserJs('core/src/nlp.ts', 'Nlp', [
+  'parseRule', 'parseViaLLM', 'parseDual',
+]);
+
 const appJs = read('ui/src/app.js');
 const petJs = read('ui/src/pet.js');
 const css = read('ui/src/style.css');
@@ -195,6 +199,20 @@ if (!window.__PLAN_PAL_COMPAT__) {
         </select>
       </label>
     </div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;color:#6b7280;font-size:13px;user-select:none">🤖 AI 智能解析设置（可选，不填则用本地规则）</summary>
+      <div class="grid params" style="margin-top:8px">
+        <label>接口地址 (OpenAI 兼容) <input id="llm-endpoint" placeholder="https://api.openai.com/v1/chat/completions" style="width:100%"></label>
+        <label>模型名 <input id="llm-model" placeholder="gpt-4o-mini" style="width:100%"></label>
+        <label style="grid-column:1/-1">API Key <input id="llm-key" type="password" placeholder="sk-..." style="width:100%"></label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="llm-save" class="mini">💾 保存 AI 设置</button>
+        <button id="llm-clear" class="mini">🧹 清除（只用规则解析）</button>
+        <span id="llm-status" class="hint" style="margin:0"></span>
+      </div>
+      <p class="hint">配置后，一句话加计划将先交给大模型理解（更懂「下周三前把PPT弄好」这类复杂表达），8 秒无响应或失败自动退回本地规则解析。Key 仅保存在本机浏览器。</p>
+    </details>
   </section>
   <section class="panel wide" id="panel-timeline">
     <h2>🕐 今日时间轴 <span id="today-label"></span>
@@ -214,6 +232,9 @@ ${storeJs}
 <script>
 ${checklistJs}
 ${icsJs}
+</script>
+<script>
+${nlpJs}
 </script>
 <script>
 ${petJs}

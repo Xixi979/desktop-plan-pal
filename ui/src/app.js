@@ -101,52 +101,23 @@
     return false;
   };
 
-  // ---- 一句话解析（规则版；LLM 双路由在 v0.2 接入）----
+  // ---- 一句话解析（v0.2 双路由：下沉到 core/src/nlp.ts，本地规则 + 可选 LLM，LLM 失败自动降级）----
   function parseQuick(text) {
-    const t = text.trim();
-    const mh = /(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?/.exec(t);
-    const mm = /(\d+)\s*分钟/.exec(t);
-    let minutes = 60;
-    if (mh) minutes = Math.round(parseFloat(mh[1]) * 60 + (mh[2] ? 30 : 0));
-    else if (mm) minutes = parseInt(mm[1], 10);
-
-    const base = new Date();
-    const at = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T22:00`;
-    let deadline = null;
-    const iso = /(\d{4}-\d{2}-\d{2})/.exec(t);
-    const md = /(\d{1,2})月(\d{1,2})[日号]/.exec(t);
-    const rel = /(今天|明天|后天)/.exec(t);
-    const wk = /(?:周|星期)([一二三四五六日天])/.exec(t);
-    if (iso) deadline = iso[1] + 'T22:00';
-    else if (md) deadline = at(new Date(base.getFullYear(), +md[1] - 1, +md[2]));
-    else if (rel) {
-      const off = { 今天: 0, 明天: 1, 后天: 2 }[rel[1]];
-      deadline = at(new Date(base.getTime() + off * 86400000));
-    } else if (wk) {
-      const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
-      let diff = (map[wk[1]] - base.getDay() + 7) % 7;
-      if (diff === 0) diff = 7;
-      deadline = at(new Date(base.getTime() + diff * 86400000));
-    }
-
-    const catMap = [['单词', '英语'], ['英语', '英语'], ['健身', '健身'], ['运动', '健身'],
-      ['刷题', '刷题'], ['习题', '刷题'], ['作业', '刷题'], ['阅读', '阅读'],
-      ['读书', '阅读'], ['实验', '报告'], ['报告', '报告'], ['复习', '学习']];
-    let category = '学习';
-    for (const [k, v] of catMap) { if (t.includes(k)) { category = v; break; } }
-
-    const title = t
-      .replace(/(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?|(\d+)\s*分钟/g, '')
-      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})之?前?(完成|搞定|结束)/g, '')
-      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})/g, '')
-      .trim() || '新计划';
-
+    const r = Nlp.parseRule(text);
     return {
-      title, category, estimatedMinutes: minutes,
-      priority: /紧急|尽快|ASAP/.test(t) ? 5 : 3,
-      splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
-      deadline,
+      title: r.title, category: r.category, estimatedMinutes: r.estimatedMinutes,
+      priority: r.priority, splittable: r.splittable, minBlockMinutes: r.minBlockMinutes,
+      deadline: r.deadline, via: r.via,
     };
+  }
+
+  /** LLM 配置（存 LS，强度参数面板「AI 设置」维护）；无配置返回 null */
+  function getLlmConfig() {
+    try {
+      const c = JSON.parse(LS.get('plan-pal.llm') || 'null');
+      if (c && c.endpoint && c.apiKey && c.model) return c;
+    } catch (e) { /* 忽略 */ }
+    return null;
   }
 
   // ---- 链接识别（本地规则版）----
@@ -752,11 +723,23 @@
   function bind() {
     bindTabs();
     bindNav();
-    // 通道一：一句话（同名计划自动并入并完善达标要求）
+    // 通道一：一句话（同名计划自动并入并完善达标要求；v0.2 双路由解析）
     $('quick-add').onclick = async () => {
       const raw = $('quick-input').value;
       if (!raw.trim()) { showToast('请先输入计划内容，如：写实验报告 3小时 周五前'); $('quick-input').focus(); return; }
-      const parsed = parseQuick(raw);
+      let parsed = parseQuick(raw);
+      // 双路由：配置了 LLM 则尝试智能解析（失败/超时自动降级规则版）
+      const llm = getLlmConfig();
+      if (llm) {
+        try {
+          const r2 = await Nlp.parseDual(raw, { llm });
+          parsed = {
+            title: r2.title, category: r2.category, estimatedMinutes: r2.estimatedMinutes,
+            priority: r2.priority, splittable: r2.splittable, minBlockMinutes: r2.minBlockMinutes,
+            deadline: r2.deadline, via: r2.via,
+          };
+        } catch (e) { showToast('AI 解析失败，已用规则解析'); }
+      }
       const target = store.listTasks().find((t) =>
         t.status !== 'done' && t.status !== 'cancelled' && normTitle(t.title) === normTitle(parsed.title));
       const checklist = genChecklistFromEntry({ note: raw, title: parsed.title });
@@ -988,6 +971,21 @@
       await store.setIntensity(p);
       reschedule();
     };
+    // AI 智能解析设置（存 LS；key 仅本机）
+    $('llm-save').onclick = () => {
+      const endpoint = $('llm-endpoint').value.trim();
+      const model = $('llm-model').value.trim();
+      const apiKey = $('llm-key').value.trim();
+      if (!endpoint || !model || !apiKey) { showToast('接口地址、模型名、Key 都要填哦'); return; }
+      LS.set('plan-pal.llm', JSON.stringify({ endpoint, model, apiKey }));
+      $('llm-status').textContent = '✓ 已保存，一句话加计划将优先用 AI 解析';
+      showToast('AI 智能解析已开启');
+    };
+    $('llm-clear').onclick = () => {
+      LS.set('plan-pal.llm', '');
+      $('llm-status').textContent = '已清除，使用本地规则解析';
+      showToast('已清除 AI 设置');
+    };
   }
 
   function fillParams() {
@@ -998,6 +996,14 @@
     $('p-bmin').value = p.blockMinMinutes;
     $('p-break').value = p.minBreakMinutes;
     $('p-chain').value = p.consecutiveWorkCapMinutes;
+    // 回填 AI 设置
+    const llm = getLlmConfig();
+    if (llm) {
+      $('llm-endpoint').value = llm.endpoint;
+      $('llm-model').value = llm.model;
+      $('llm-key').value = llm.apiKey;
+      $('llm-status').textContent = '✓ AI 智能解析已开启';
+    }
   }
 
   // ---- 启动 ----
