@@ -286,24 +286,31 @@ export class PlanStore {
     return this.intensity;
   }
 
-  /** 撤销最近一条变更（追加补偿条目，日志本身不可变） */
+  /** 撤销最近一条变更（追加补偿条目，日志本身不可变；补偿条目自身不可再撤销） */
   async undo(): Promise<boolean> {
+    let target = -1;
     for (let i = this.history.length - 1; i >= 0; i--) {
       const entry = this.history[i];
-      // 补偿条目只作用于数据实体；快照类操作不可撤销
+      // 跳过强度参数（配置类操作不参与撤销）与历史补偿条目（防止来回翻转）
       if (entry.entity === 'intensityProfile') continue;
-      this.history.splice(i, 1);
-      if (entry.op === 'create') {
-        await this.commit(entry.entity, entry.entityId, 'delete', { before: entry.payload.after });
-      } else if (entry.op === 'update') {
-        await this.commit(entry.entity, entry.entityId, 'update',
-          { before: entry.payload.after, after: entry.payload.before });
-      } else {
-        await this.commit(entry.entity, entry.entityId, 'create', { after: entry.payload.before });
-      }
-      await this.saveSnapshot();
-      return true;
+      if (entry.payload && entry.payload.__undoCompensation) continue;
+      target = i;
+      break;
     }
-    return false;
+    if (target < 0) return false;
+    const entry = this.history[target];
+    this.history.splice(target, 1);
+    if (entry.op === 'create') {
+      await this.commit(entry.entity, entry.entityId, 'delete',
+        { before: entry.payload.after, __undoCompensation: true });
+    } else if (entry.op === 'update') {
+      await this.commit(entry.entity, entry.entityId, 'update',
+        { before: entry.payload.after, after: entry.payload.before, __undoCompensation: true });
+    } else {
+      await this.commit(entry.entity, entry.entityId, 'create',
+        { after: entry.payload.before, __undoCompensation: true });
+    }
+    await this.saveSnapshot();
+    return true;
   }
 }
