@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>计划小人</title>
+<style>
+/* 桌面计划小人 v0.1 样式（浅色主题） */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: #f4f6fa; color: #1f2937; padding-bottom: 60px;
+}
+header {
+  background: #fff; padding: 14px 24px; display: flex;
+  justify-content: space-between; align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 10;
+}
+h1 { font-size: 20px; }
+h1 .ver { font-size: 12px; color: #6b7280; font-weight: normal; }
+h2 { font-size: 15px; margin-bottom: 10px; color: #374151; }
+.header-actions button { margin-left: 8px; }
+button {
+  background: #4f6ef7; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #3d5be0; }
+button.danger { background: #ef4444; }
+button.danger:hover { background: #dc2626; }
+input, select {
+  border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px;
+  font-size: 13px; background: #fff;
+}
+main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+.panel { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.panel.wide { grid-column: 1 / -1; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.form { margin-bottom: 10px; }
+.preview { font-size: 12px; color: #6b7280; margin-top: 6px; min-height: 16px; }
+#quick-input { flex: 1; min-width: 260px; }
+#task-title { flex: 1; min-width: 140px; }
+#evt-title { flex: 1; min-width: 120px; }
+ul { list-style: none; }
+#task-list li, #evt-list li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 4px;
+  border-bottom: 1px solid #f1f3f7; font-size: 13px;
+}
+#task-list li.done { opacity: .5; text-decoration: line-through; }
+#task-list li.empty, #evt-list li.empty { color: #9ca3af; border: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.meta { color: #6b7280; font-size: 12px; flex: 1; }
+.ops button { padding: 2px 8px; font-size: 12px; background: #eef1f8; color: #374151; }
+.ops button:hover { background: #dbe2f5; }
+.grid.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid.params label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5563; }
+.warning {
+  background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+  border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px;
+}
+#timeline-wrap { max-height: 560px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafbfd; }
+#timeline { position: relative; margin-left: 52px; }
+.hour-line { position: absolute; left: 0; right: 0; border-top: 1px dashed #e5e7eb; }
+.hour-line span { position: absolute; left: -50px; top: -8px; font-size: 11px; color: #9ca3af; }
+.block {
+  position: absolute; left: 8px; right: 8px; border-radius: 6px;
+  color: #1f2937; font-size: 12px; overflow: hidden; padding: 2px 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12); line-height: 1.4;
+}
+.block .b-title { pointer-events: none; }
+.block.fixed { background: #cbd5e1 !important; }
+.block.break { background: #86efac !important; }
+.now-line { position: absolute; left: 0; right: 0; border-top: 2px solid #ef4444; z-index: 5; }
+.now-line::before { content: "现在"; position: absolute; left: -50px; top: -9px; font-size: 11px; color: #ef4444; }
+#pet {
+  position: fixed; right: 24px; bottom: 24px; z-index: 99;
+  font-size: 40px; cursor: default; text-align: center;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.2));
+}
+#pet-bubble {
+  position: absolute; bottom: 110%; right: 0; white-space: nowrap;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 6px 12px; font-size: 13px; color: #374151;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#pet-bubble::after {
+  content: ""; position: absolute; right: 16px; top: 100%;
+  border: 6px solid transparent; border-top-color: #fff;
+}
+footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 20px; }
+footer a { color: #6b7280; }
+
+/* ---- v0.1.5：多通道录入 / 达标清单 / 文件夹 ---- */
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.tabs .tab {
+  background: #eef1f8; color: #4b5563; padding: 5px 12px; border-radius: 16px; font-size: 13px;
+}
+.tabs .tab.active { background: #4f6ef7; color: #fff; }
+.tabpane.hidden, .hidden { display: none; }
+.hint { font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+#img-drop {
+  border: 2px dashed #c7d2fe; border-radius: 8px; padding: 22px 12px; text-align: center;
+  color: #6b7280; font-size: 13px; cursor: pointer; transition: all .15s;
+}
+#img-drop:hover, #img-drop.dragging { border-color: #4f6ef7; background: #eef2ff; color: #4f6ef7; }
+.img-prev-wrap { text-align: center; margin: 10px 0; }
+#img-thumb { max-width: 200px; max-height: 140px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.badge { font-size: 12px; margin-left: 6px; background: #f3f4f6; border-radius: 8px; padding: 1px 6px; }
+.ck-badge { background: #ecfdf5; color: #059669; font-weight: bold; }
+#task-list li { display: block; }
+#task-list li .t-main { display: flex; align-items: center; gap: 8px; padding: 7px 4px; }
+.t-detail { margin: 0 4px 8px 18px; font-size: 13px; }
+.t-detail summary { cursor: pointer; color: #6b7280; font-size: 12px; user-select: none; }
+.t-detail summary:hover { color: #4f6ef7; }
+.ck-box { margin: 8px 0; padding: 8px 10px; background: #f8fafc; border-radius: 8px; }
+.ck-item {
+  display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 13px; cursor: pointer;
+}
+.ck-item.ck-done span { color: #9ca3af; text-decoration: line-through; }
+.ck-add-row { margin-top: 6px; }
+.folder-box { margin: 8px 0; padding: 8px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 13px; }
+.attach-box { margin: 6px 0; font-size: 12px; word-break: break-all; }
+.attach-img { max-width: 220px; max-height: 160px; border-radius: 8px; display: block; margin-top: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.attach-box a { color: #4f6ef7; }
+#err-banner {
+  background: #fef2f2; color: #b91c1c; border-bottom: 1px solid #fecaca;
+  padding: 8px 24px; font-size: 13px;
+}
+.img-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.img-chip { position: relative; display: inline-block; }
+.img-chip img {
+  width: 84px; height: 64px; object-fit: cover; border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15); display: block;
+}
+.chip-x {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+  border-radius: 50%; background: #ef4444; color: #fff; font-size: 12px;
+  line-height: 18px; padding: 0; text-align: center;
+}
+.link-list { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
+.link-chip {
+  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  background: #f5f8ff; border: 1px solid #dbe4ff; border-radius: 6px; padding: 5px 8px;
+}
+.link-chip .chip-x { position: static; flex-shrink: 0; }
+
+/* ---- 板块折叠导航 ---- */
+#panel-nav {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+#panel-nav .nav-btn {
+  background: #eef1f8; color: #4b5563; border-radius: 16px; padding: 6px 16px; font-size: 13px;
+}
+#panel-nav .nav-btn:hover { background: #dbe2f5; }
+#panel-nav .nav-btn.active { background: #4f6ef7; color: #fff; }
+.nav-hint { font-size: 12px; color: #9ca3af; margin-left: 4px; }
+
+/* ---- v0.1.9：ICS 导入 + 周视图 ---- */
+.ics-result { font-size: 12px; color: #16a34a; margin-left: 6px; }
+button.mini { padding: 2px 10px; font-size: 12px; margin-left: 8px; vertical-align: middle; }
+#week-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 10px; }
+.week-col { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; min-height: 120px; }
+.week-col.today { border-color: #4f6ef7; background: #eef2ff; }
+.week-head { font-weight: 600; font-size: 13px; text-align: center; margin-bottom: 6px; }
+.week-head small { display: block; font-weight: 400; color: #94a3b8; }
+.week-item { font-size: 12px; padding: 3px 6px; margin-bottom: 4px; background: #fff;
+  border-left: 3px solid #b0b7c3; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-item small { color: #94a3b8; margin-right: 4px; }
+
+/* ---- v0.1.10：Toast 轻提示 ---- */
+#pp-toast {
+  position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%) translateY(16px);
+  background: rgba(17, 24, 39, 0.92); color: #fff; font-size: 14px;
+  padding: 10px 18px; border-radius: 8px; z-index: 9999;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  max-width: 80vw;
+}
+#pp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---- v0.2：小人 Sprite + 状态机动画 ---- */
+#pet { transition: transform .3s; }
+#pet .pet-svg { display: block; }
+#pet.st-happy { animation: pet-jump .55s ease-in-out infinite; }
+#pet.st-idle .pet-body { animation: pet-breathe 2.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-body { animation: pet-bob .5s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-working .pet-arm { animation: pet-type .35s ease-in-out infinite; }
+#pet.st-working .arm-l { animation-delay: .18s; transform-origin: 23px 65px; }
+#pet.st-working .arm-r { transform-origin: 97px 65px; }
+#pet.st-break .pet-body { animation: pet-sway 2.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-break .pet-steam { animation: pet-steam 1.8s linear infinite; opacity: 0; }
+#pet.st-tired .pet-body { animation: pet-wobble 3.2s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-tired .pet-sweat { animation: pet-sweat 1.6s ease-in infinite; opacity: 0; }
+#pet.st-sleeping .pet-body { animation: pet-breathe 3.6s ease-in-out infinite; transform-origin: 60px 100px; }
+#pet.st-sleeping .pet-z { animation: pet-zfloat 2.4s ease-out infinite; opacity: 0; }
+#pet.st-sleeping .z2 { animation-delay: .5s; }
+#pet.st-sleeping .z3 { animation-delay: 1s; }
+
+/* 常驻：眨眼（所有状态） */
+#pet .pet-eyes { animation: pet-blink 4.5s infinite; transform-origin: 60px 56px; }
+
+/* 部件可见性（默认隐藏，按状态显示） */
+#pet .pet-eyes-happy, #pet .pet-eyes-closed, #pet .pet-mouth-smile,
+#pet .pet-cup, #pet .pet-zzz, #pet .pet-stars, #pet .pet-sweat { visibility: hidden; }
+#pet.st-happy .pet-eyes, #pet.st-sleeping .pet-eyes { visibility: hidden; }
+#pet.st-happy .pet-eyes-happy, #pet.st-happy .pet-mouth-smile,
+#pet.st-happy .pet-stars, #pet.st-sleeping .pet-eyes-closed,
+#pet.st-sleeping .pet-zzz, #pet.st-break .pet-cup { visibility: visible; }
+#pet.st-sleeping .pet-antenna-ball, #pet.st-sleeping .pet-antenna { opacity: .4; }
+
+@keyframes pet-breathe { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.045); } }
+@keyframes pet-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes pet-sway { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes pet-wobble { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes pet-jump { 0%,100% { transform: translateY(0); } 45% { transform: translateY(-16px); } 60% { transform: translateY(-16px); } }
+@keyframes pet-type { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+@keyframes pet-blink { 0%,91%,100% { transform: scaleY(1); } 94%,97% { transform: scaleY(.08); } }
+@keyframes pet-sweat { 0% { opacity: 0; transform: translateY(-4px); } 25% { opacity: 1; } 80% { opacity: 1; transform: translateY(10px); } 100% { opacity: 0; transform: translateY(14px); } }
+@keyframes pet-zfloat { 0% { opacity: 0; transform: translate(0,0); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(8px,-18px); } }
+@keyframes pet-steam { 0% { opacity: 0; } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes pet-star { 0%,100% { opacity: .4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.25); } }
+#pet.st-happy .pet-star { animation: pet-star 1s ease-in-out infinite; }
+#pet.st-happy .s2 { animation-delay: .3s; }
+#pet.st-happy .s3 { animation-delay: .6s; }
+
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  background: linear-gradient(160deg, #1e2440 0%, #2a3358 60%, #35406b 100%);
+  border-radius: 14px; user-select: none;
+}
+#pet {
+  position: fixed; left: calc(50% - 75px); right: auto; bottom: 18px;
+  width: 150px; height: 150px;
+}
+#pet-bubble {
+  left: 50%; right: auto; transform: translateX(-50%); bottom: calc(100% + 10px);
+  max-width: 230px; font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div id="pet"><div id="pet-bubble">加载中…</div></div>
+<script>
+/* 桌面计划小人 v0.2 —— Sprite + 状态机（纯 SVG + CSS 动画，零依赖）
+ *
+ * 六种状态（Pet.setState 由 app.js 按计划数据驱动调用）：
+ *   idle     待机        呼吸 + 眨眼，气泡显示接下来要做什么
+ *   working  工作中      身体快速上下小幅起伏 + 手臂敲击
+ *   break    休息中      左右摇摆 + 端茶杯
+ *   happy    达标/全完成  跳跃庆祝 + 眼睛变弯 + 周围小星星
+ *   tired    超载疲惫    缓慢摇晃 + 流汗
+ *   sleeping 打瞌睡      眼睛闭合 + Zzz 上浮（深夜或无计划）
+ *
+ * 兼容性：本文件禁用 ?. ?? replaceAll 等 ES2020+ 语法（与 app.js 同规则）。
+ */
+(function () {
+  'use strict';
+
+  var SVG = [
+    '<svg class="pet-svg" viewBox="0 0 120 130" width="96" height="104" aria-hidden="true">',
+    '  <ellipse class="pet-shadow" cx="60" cy="122" rx="26" ry="5" fill="#0f172a" opacity=".12"/>',
+    '  <g class="pet-all">',
+    '    <g class="pet-stars">',
+    '      <text class="pet-star s1" x="18" y="30" font-size="14">✦</text>',
+    '      <text class="pet-star s2" x="96" y="22" font-size="12">✦</text>',
+    '      <text class="pet-star s3" x="102" y="52" font-size="10">✦</text>',
+    '    </g>',
+    '    <g class="pet-zzz">',
+    '      <text class="pet-z z1" x="86" y="34" font-size="13">Z</text>',
+    '      <text class="pet-z z2" x="96" y="24" font-size="11">z</text>',
+    '      <text class="pet-z z3" x="104" y="16" font-size="9">z</text>',
+    '    </g>',
+    '    <path class="pet-sweat" d="M94 40 q5 8 0 12 q-5 -4 0 -12" fill="#7dd3fc"/>',
+    '    <g class="pet-body">',
+    '      <line class="pet-antenna" x1="60" y1="26" x2="60" y2="14" stroke="#4f6ef7" stroke-width="3" stroke-linecap="round"/>',
+    '      <circle class="pet-antenna-ball" cx="60" cy="11" r="4" fill="#f59e0b"/>',
+    '      <path class="pet-body-shape" d="M28 62 q0 -38 32 -38 q32 0 32 38 q0 40 -32 40 q-32 0 -32 -40" fill="#dbe4ff" stroke="#4f6ef7" stroke-width="3"/>',
+    '      <g class="pet-face">',
+    '        <g class="pet-eyes">',
+    '          <circle class="pet-eye" cx="47" cy="56" r="4.5" fill="#1f2937"/>',
+    '          <circle class="pet-eye" cx="73" cy="56" r="4.5" fill="#1f2937"/>',
+    '        </g>',
+    '        <path class="pet-eyes-happy" d="M42 58 q5 -7 10 0 M68 58 q5 -7 10 0" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>',
+    '        <path class="pet-eyes-closed" d="M42 57 h11 M68 57 h11" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/>',
+    '        <circle class="pet-blush" cx="40" cy="66" r="4" fill="#fbcfe8"/>',
+    '        <circle class="pet-blush" cx="80" cy="66" r="4" fill="#fbcfe8"/>',
+    '        <path class="pet-mouth" d="M55 68 q5 5 10 0" fill="none" stroke="#1f2937" stroke-width="2.5" stroke-linecap="round"/>',
+    '        <path class="pet-mouth-smile" d="M54 67 q6 8 12 0 q-6 3 -12 0" fill="#1f2937"/>',
+    '      </g>',
+    '      <g class="pet-arm arm-l"><rect x="16" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/></g>',
+    '      <g class="pet-arm arm-r"><rect x="90" y="62" width="14" height="7" rx="3.5" fill="#4f6ef7"/></g>',
+    '      <g class="pet-cup">',
+    '        <rect x="88" y="76" width="16" height="12" rx="2" fill="#fff" stroke="#b45309" stroke-width="2"/>',
+    '        <path d="M104 79 q6 3 0 6" fill="none" stroke="#b45309" stroke-width="2"/>',
+    '        <path class="pet-steam" d="M93 72 q2 -4 0 -7 M97 72 q2 -4 0 -7" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>',
+    '      </g>',
+    '    </g>',
+    '  </g>',
+    '</svg>',
+  ].join('');
+
+  var VALID = ['idle', 'working', 'break', 'happy', 'tired', 'sleeping'];
+  var current = '';
+  var root = null;
+  var bubble = null;
+
+  function mount() {
+    root = document.getElementById('pet');
+    if (!root || root.querySelector('.pet-svg')) return;
+    root.insertAdjacentHTML('afterbegin', SVG);
+    root.classList.add('st-idle');
+    bubble = document.getElementById('pet-bubble');
+  }
+
+  /** 状态机：切换视觉状态 + 更新气泡文案（文案可为空表示不变） */
+  function setState(state, message) {
+    if (!root) mount();
+    if (!root) return;
+    if (VALID.indexOf(state) < 0) state = 'idle';
+    if (state !== current) {
+      root.classList.remove('st-' + current);
+      root.classList.add('st-' + state);
+      current = state;
+    }
+    if (bubble && typeof message === 'string' && message) bubble.textContent = message;
+  }
+
+  function getState() { return current; }
+
+  // 页面加载后立即可见（app.js init 之前也显示待机状态）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+
+  window.Pet = { mount: mount, setState: setState, getState: getState };
+})();
+
+</script>
+<script>
+/**
+ * 桌宠独立窗逻辑（pet.html 专用）
+ * - 与主页面同源（file://），直接读共享 localStorage：
+ *     plan-pal.blocks → 当前排程块
+ *     plan-pal.snap   → 任务标题/达标/强度快照
+ * - 主页面任何改动（storage 事件）→ 桌宠状态实时联动
+ * - 点击小人 → 打开主计划页
+ */
+(function () {
+  'use strict';
+
+  var PAD = function (n) { return (n < 10 ? '0' : '') + n; };
+
+  function lsGet(k) {
+    try { return localStorage.getItem(k); } catch (e) { return null; }
+  }
+
+  function readJson(k, fallback) {
+    try {
+      var v = JSON.parse(lsGet(k) || 'null');
+      return v == null ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+
+  function todayStr(d) {
+    return d.getFullYear() + '-' + PAD(d.getMonth() + 1) + '-' + PAD(d.getDate());
+  }
+
+  /** 主循环：按计划数据计算状态并驱动小人 */
+  function tick() {
+    var blocks = readJson('plan-pal.blocks', []);
+    var snap = readJson('plan-pal.snap', null);
+    var tasks = (snap && snap.tasks) || [];
+    var now = new Date();
+    var nm = now.getHours() * 60 + now.getMinutes();
+    var today = todayStr(now);
+
+    // 深夜/凌晨 → 打瞌睡
+    if (nm < 6 * 60 || nm >= 23 * 60) {
+      Pet.setState('sleeping', '夜深了，早点休息哦～');
+      return;
+    }
+
+    // 当前进行中的块
+    var current = null;
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (!b || !b.start || !b.end) continue;
+      var s = new Date(b.start);
+      var e = new Date(b.end);
+      var sm = s.getHours() * 60 + s.getMinutes();
+      var em = e.getHours() * 60 + e.getMinutes();
+      if (todayStr(s) === today && sm <= nm && nm < em) { current = b; break; }
+    }
+
+    if (current) {
+      var task = null;
+      for (var j = 0; j < tasks.length; j++) { if (tasks[j].id === current.taskId) { task = tasks[j]; break; } }
+      var endM = new Date(current.end);
+      var left = endM.getHours() * 60 + endM.getMinutes() - nm;
+      if (current.type === 'break') {
+        Pet.setState('break', '休息中，还剩 ' + left + ' 分钟～');
+      } else if (task && task.checklist && task.checklist.length) {
+        var done = 0;
+        for (var k = 0; k < task.checklist.length; k++) { if (task.checklist[k].done) done++; }
+        Pet.setState('working', '「' + task.title + '」达标 ' + done + '/' + task.checklist.length + '，还剩 ' + left + ' 分钟');
+      } else {
+        Pet.setState('working', '正在做「' + (task ? task.title : '计划') + '」，还剩 ' + left + ' 分钟');
+      }
+      return;
+    }
+
+    // 今日任务是否全部完成 → 庆祝
+    var remaining = 0;
+    var remainingMin = 0;
+    for (var m = 0; m < tasks.length; m++) {
+      var t = tasks[m];
+      if (t.status !== 'done' && t.status !== 'cancelled') {
+        remaining++;
+        remainingMin += t.estimatedMinutes || 60;
+      }
+    }
+    if (tasks.length > 0 && remaining === 0) {
+      Pet.setState('happy', '今天的计划全部完成啦，撒花！🎉');
+      return;
+    }
+
+    // 超载 → 疲惫（今日剩余时长超过每日容量上限）
+    var cap = (snap && snap.intensity && snap.intensity.dailyLoadCapMinutes) || 480;
+    if (remainingMin > cap) {
+      Pet.setState('tired', '今天还有 ' + remaining + ' 件事（约 ' + remainingMin + ' 分钟），记得劳逸结合');
+      return;
+    }
+
+    // 否则待机 + 下一块预告
+    var next = null;
+    for (var n = 0; n < blocks.length; n++) {
+      var nb = blocks[n];
+      if (!nb || !nb.start) continue;
+      var ns = new Date(nb.start);
+      if (todayStr(ns) === today && ns.getHours() * 60 + ns.getMinutes() > nm) {
+        if (!next || nb.start < next.start) next = nb;
+      }
+    }
+    if (next) {
+      var ntask = null;
+      for (var p = 0; p < tasks.length; p++) { if (tasks[p].id === next.taskId) { ntask = tasks[p]; break; } }
+      Pet.setState('idle', '接下来 ' + next.start.slice(11, 16) + '：' + (ntask ? ntask.title : '计划'));
+    } else {
+      Pet.setState('idle', remaining > 0
+        ? '今天暂无安排，还有 ' + remaining + ' 件事等你排上日程～'
+        : '暂无计划，点我可以添加哦～');
+    }
+  }
+
+  // 主页面数据变化 → 实时联动
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'plan-pal.blocks' || e.key === 'plan-pal.snap') tick();
+  });
+
+  // 点击小人 → 打开主计划页
+  function bindOpen() {
+    var pet = document.getElementById('pet');
+    if (!pet) return;
+    pet.style.cursor = 'pointer';
+    pet.addEventListener('click', function () {
+      try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
+    });
+  }
+
+  function boot() {
+    Pet.mount();
+    bindOpen();
+    tick();
+    setInterval(tick, 30 * 1000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+
+</script>
+</body>
+</html>

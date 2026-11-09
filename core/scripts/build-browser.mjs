@@ -48,7 +48,7 @@ const nlpJs = toBrowserJs('core/src/nlp.ts', 'Nlp', [
 const appJs = read('ui/src/app.js');
 const petJs = read('ui/src/pet.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.2.1 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.2.2 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -257,5 +257,43 @@ const selftestHtml = html.replace(
 );
 writeFileSync(join(root, 'ui', 'selftest.html'), selftestHtml, 'utf8');
 
+// 桌宠独立小窗（Edge --app 模式打开，悬浮桌面）：只含小人 + 气泡，读共享 localStorage 联动
+const petStandaloneJs = read('ui/src/pet-standalone.js');
+const petHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>计划小人</title>
+<style>
+${css}
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  background: linear-gradient(160deg, #1e2440 0%, #2a3358 60%, #35406b 100%);
+  border-radius: 14px; user-select: none;
+}
+#pet {
+  position: fixed; left: calc(50% - 75px); right: auto; bottom: 18px;
+  width: 150px; height: 150px;
+}
+#pet-bubble {
+  left: 50%; right: auto; transform: translateX(-50%); bottom: calc(100% + 10px);
+  max-width: 230px; font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div id="pet"><div id="pet-bubble">加载中…</div></div>
+<script>
+${petJs}
+</script>
+<script>
+${petStandaloneJs}
+</script>
+</body>
+</html>
+`;
+writeFileSync(join(root, 'ui', 'pet.html'), petHtml, 'utf8');
+
 console.log(`✓ 已生成 ui/index.html（${(html.length / 1024).toFixed(1)} KB，自包含单文件）`);
 console.log(`✓ 已生成 ui/selftest.html（${(selftestHtml.length / 1024).toFixed(1)} KB，自测页）`);
+console.log(`✓ 已生成 ui/pet.html（${(petHtml.length / 1024).toFixed(1)} KB，桌面悬浮小人窗）`);
