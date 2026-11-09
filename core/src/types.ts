@@ -42,8 +42,10 @@ export interface Block {
 export interface FixedEvent {
   id: string;
   title: string;
-  rrule: string;                 // RFC 5545 重复规则
-  effectiveFrom: string;
+  startTime: string;             // "HH:mm"，当日开始时刻
+  endTime: string;               // "HH:mm"，"24:00" 表示到当日午夜
+  rrule: string;                 // RFC 5545 重复规则（支持 FREQ=DAILY / WEEKLY;BYDAY=MO,TU）；空串表示仅在 effectiveFrom 当天一次性发生
+  effectiveFrom: string;         // "YYYY-MM-DD"
   effectiveUntil?: string;       // 支持学期周期
   exceptions?: string[];         // 例外日期
 }

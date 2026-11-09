@@ -1,0 +1,16 @@
+{
+  "name": "@desktop-plan-pal/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "桌面计划小人 - 排程引擎（纯逻辑，可被桌面端与手机端复用）",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
