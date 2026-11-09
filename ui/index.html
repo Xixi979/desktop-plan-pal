@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桌面计划小人 · v0.1</title>
+<style>
+/* 桌面计划小人 v0.1 样式（浅色主题） */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  background: #f4f6fa; color: #1f2937; padding-bottom: 60px;
+}
+header {
+  background: #fff; padding: 14px 24px; display: flex;
+  justify-content: space-between; align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 10;
+}
+h1 { font-size: 20px; }
+h1 .ver { font-size: 12px; color: #6b7280; font-weight: normal; }
+h2 { font-size: 15px; margin-bottom: 10px; color: #374151; }
+.header-actions button { margin-left: 8px; }
+button {
+  background: #4f6ef7; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #3d5be0; }
+button.danger { background: #ef4444; }
+button.danger:hover { background: #dc2626; }
+input, select {
+  border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px;
+  font-size: 13px; background: #fff;
+}
+main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; }
+.panel { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.panel.wide { grid-column: 1 / -1; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.form { margin-bottom: 10px; }
+.preview { font-size: 12px; color: #6b7280; margin-top: 6px; min-height: 16px; }
+#quick-input { flex: 1; min-width: 260px; }
+#task-title { flex: 1; min-width: 140px; }
+#evt-title { flex: 1; min-width: 120px; }
+ul { list-style: none; }
+#task-list li, #evt-list li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 4px;
+  border-bottom: 1px solid #f1f3f7; font-size: 13px;
+}
+#task-list li.done { opacity: .5; text-decoration: line-through; }
+#task-list li.empty, #evt-list li.empty { color: #9ca3af; border: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.meta { color: #6b7280; font-size: 12px; flex: 1; }
+.ops button { padding: 2px 8px; font-size: 12px; background: #eef1f8; color: #374151; }
+.ops button:hover { background: #dbe2f5; }
+.grid.params { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid.params label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5563; }
+.warning {
+  background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+  border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 8px;
+}
+#timeline-wrap { max-height: 560px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; background: #fafbfd; }
+#timeline { position: relative; margin-left: 52px; }
+.hour-line { position: absolute; left: 0; right: 0; border-top: 1px dashed #e5e7eb; }
+.hour-line span { position: absolute; left: -50px; top: -8px; font-size: 11px; color: #9ca3af; }
+.block {
+  position: absolute; left: 8px; right: 8px; border-radius: 6px;
+  color: #1f2937; font-size: 12px; overflow: hidden; padding: 2px 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12); line-height: 1.4;
+}
+.block .b-title { pointer-events: none; }
+.block.fixed { background: #cbd5e1 !important; }
+.block.break { background: #86efac !important; }
+.now-line { position: absolute; left: 0; right: 0; border-top: 2px solid #ef4444; z-index: 5; }
+.now-line::before { content: "现在"; position: absolute; left: -50px; top: -9px; font-size: 11px; color: #ef4444; }
+#pet {
+  position: fixed; right: 24px; bottom: 24px; z-index: 99;
+  font-size: 40px; cursor: default; text-align: center;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.2));
+}
+#pet-bubble {
+  position: absolute; bottom: 110%; right: 0; white-space: nowrap;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 6px 12px; font-size: 13px; color: #374151;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+#pet-bubble::after {
+  content: ""; position: absolute; right: 16px; top: 100%;
+  border: 6px solid transparent; border-top-color: #fff;
+}
+footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 20px; }
+footer a { color: #6b7280; }
+
+</style>
+</head>
+<body>
+<div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
+<header>
+  <h1>桌面计划小人 <span class="ver">v0.1</span></h1>
+  <div class="header-actions">
+    <button id="btn-reschedule">🔄 重新排程</button>
+    <button id="btn-undo">↩️ 撤销</button>
+    <button id="btn-export">📤 导出数据</button>
+    <button id="btn-clear" class="danger">🗑️ 清空数据</button>
+  </div>
+</header>
+<main>
+  <section class="panel" id="panel-quick">
+    <h2>⚡ 一句话加计划</h2>
+    <div class="row">
+      <input id="quick-input" placeholder="例如：写实验报告 3小时 周五前（自动识别时长/DDL/类别）">
+      <button id="quick-add">添加</button>
+    </div>
+    <div id="quick-preview" class="preview"></div>
+  </section>
+  <section class="panel">
+    <h2>📝 计划列表</h2>
+    <div class="row form">
+      <input id="task-title" placeholder="标题">
+      <input id="task-cat" placeholder="类别" value="学习" style="max-width:90px">
+      <input id="task-min" type="number" placeholder="分钟" value="60" style="max-width:80px">
+      <input id="task-pri" type="number" min="1" max="5" value="3" style="max-width:60px" title="优先级1-5">
+      <input id="task-ddl" type="datetime-local" style="max-width:200px">
+      <button id="task-add">➕</button>
+    </div>
+    <ul id="task-list"></ul>
+  </section>
+  <section class="panel">
+    <h2>📅 固定安排（课表）</h2>
+    <div class="row form">
+      <input id="evt-title" placeholder="名称">
+      <input id="evt-start" type="time" value="08:00" style="max-width:110px">
+      <input id="evt-end" type="time" value="09:40" style="max-width:110px">
+      <select id="evt-freq" style="max-width:110px">
+        <option value="daily">每天</option>
+        <option value="once">仅一次</option>
+      </select>
+      <button id="evt-add">➕</button>
+      <button id="evt-sample" title="载入睡眠+三节课的示例课表">载入示例课表</button>
+    </div>
+    <ul id="evt-list"></ul>
+  </section>
+  <section class="panel">
+    <h2>🎛️ 强度参数</h2>
+    <div class="grid params">
+      <label>日负荷上限(分) <input id="p-load" type="number"></label>
+      <label>单块上限(分) <input id="p-bmax" type="number"></label>
+      <label>单块下限(分) <input id="p-bmin" type="number"></label>
+      <label>最小休息(分) <input id="p-break" type="number"></label>
+      <label>连续工作上限(分) <input id="p-chain" type="number"></label>
+      <label>精力类型
+        <select id="p-energy">
+          <option value="early">早起型</option>
+          <option value="night">夜猫型</option>
+          <option value="flat">全天平均</option>
+        </select>
+      </label>
+    </div>
+  </section>
+  <section class="panel wide">
+    <h2>🕐 今日时间轴 <span id="today-label"></span></h2>
+    <div id="warnings"></div>
+    <div id="timeline-wrap"><div id="timeline"></div></div>
+  </section>
+</main>
+<footer>桌面计划小人 · 本地优先 · 数据仅保存在本机浏览器 · <a href="https://github.com/" target="_blank">GitHub</a></footer>
+<script>
+/**
+ * 桌面计划小人 — 排程引擎
+ *
+ * 对应设计文档《整体方案》第四节。v0.1 采用「贪心 + 多因子评分」：
+ * 引擎纯函数化（输入任务/课表/参数 → 输出 Block 列表），不依赖 UI，
+ * 可单元测试、可被手机端复用。
+ *
+ * 时间约定：所有 ISO 字符串均为本地朴素时间（无时区后缀），
+ * 内部统一转为「分钟数」做区间运算。
+ */
+
+                                                                            
+
+// ---------------------------------------------------------------------------
+// 时间工具
+// ---------------------------------------------------------------------------
+
+const MIN = 60_000;
+/** 链式连续工作判定：两次工作间隔小于该阈值视为同一连续链（分钟） */
+const CHAIN_GAP_THRESHOLD = 15;
+
+function toMin(iso        )         {
+  return Math.floor(new Date(iso).getTime() / MIN);
+}
+
+function toIso(minutes        )         {
+  const d = new Date(minutes * MIN);
+  const p = (n        ) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** "YYYY-MM-DD" → 当日 00:00 的分钟数 */
+function dayStartMin(date        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  return Math.floor(new Date(y, m - 1, d).getTime() / MIN);
+}
+
+function addDays(date        , n        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + n);
+  const p = (x        ) => String(x).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+}
+
+function weekdayOf(date        )         {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay(); // 0=周日 … 6=周六
+}
+
+// ---------------------------------------------------------------------------
+// 固定事件展开（最小 RRULE 支持：DAILY / WEEKLY;BYDAY / 一次性）
+// ---------------------------------------------------------------------------
+
+const BYDAY_MAP                         = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+
+function occursOn(ev            , date        )          {
+  if (!ev.rrule) return date === ev.effectiveFrom;
+  if (date < ev.effectiveFrom) return false;
+  if (ev.effectiveUntil && date > ev.effectiveUntil) return false;
+  if (ev.exceptions?.includes(date)) return false;
+  const freq = /FREQ=(DAILY|WEEKLY)/.exec(ev.rrule)?.[1];
+  if (freq === 'DAILY') return true;
+  if (freq === 'WEEKLY') {
+    const byday = /BYDAY=([A-Z,]+)/.exec(ev.rrule)?.[1];
+    if (!byday) return weekdayOf(date) === weekdayOf(ev.effectiveFrom);
+    return byday.split(',').some((k) => BYDAY_MAP[k] === weekdayOf(date));
+  }
+  return false;
+}
+
+/** 固定事件在 date 当天的占用区间 [start, end)（分钟数） */
+function occupiedInterval(ev            , date        )                   {
+  const start = dayStartMin(date) + parseHHMM(ev.startTime);
+  const end = ev.endTime === '24:00'
+    ? dayStartMin(date) + 1440
+    : dayStartMin(date) + parseHHMM(ev.endTime);
+  return [start, Math.max(start, end)];
+}
+
+function parseHHMM(hhmm        )         {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// ---------------------------------------------------------------------------
+// 第一步：空闲槽位构造
+// ---------------------------------------------------------------------------
+
+                           
+                
+              
+ 
+
+/**
+ * 从固定事件中挖去已占用时间，得到 date 当天的自由时段。
+ * 短于 blockMinMinutes 的碎片槽直接丢弃（避免产生排不了的小缝）。
+ */
+function buildFreeSlots(
+  date        ,
+  fixedEvents              ,
+  profile                  ,
+)             {
+  const dayStart = dayStartMin(date);
+  const dayEnd = dayStart + 1440;
+
+  const occupied = fixedEvents
+    .filter((ev) => occursOn(ev, date))
+    .map((ev) => occupiedInterval(ev, date))
+    .sort((a, b) => a[0] - b[0]);
+
+  // 合并重叠区间
+  const merged                     = [];
+  for (const [s, e] of occupied) {
+    const last = merged[merged.length - 1];
+    if (last && s <= last[1]) last[1] = Math.max(last[1], e);
+    else merged.push([s, e]);
+  }
+
+  // 取补集
+  const slots             = [];
+  let cursor = dayStart;
+  for (const [s, e] of merged) {
+    if (s > cursor) pushSlot(cursor, s);
+    cursor = Math.max(cursor, e);
+  }
+  if (cursor < dayEnd) pushSlot(cursor, dayEnd);
+
+  function pushSlot(s        , e        ) {
+    if (e - s >= profile.blockMinMinutes) slots.push({ start: toIso(s), end: toIso(e) });
+  }
+  return slots;
+}
+
+// ---------------------------------------------------------------------------
+// 第二步：多因子评分
+// ---------------------------------------------------------------------------
+
+                               
+                                                                
+                                                  
+                                               
+                                                
+                                                             
+ 
+
+/** 评分权重：DDL 紧迫度 > 精力匹配 > 优先级 = 碎片适配 */
+const WEIGHTS = { urgency: 0.35, priority: 0.2, energy: 0.25, fit: 0.2 };
+
+function scorePlacement(
+  task      ,
+  slot          ,
+  profile                  ,
+)                                           {
+  const slotLen = toMin(slot.end) - toMin(slot.start);
+
+  const deadlineUrgency = task.deadline
+    ? clamp(1 - (toMin(task.deadline) - toMin(slot.start)) / (14 * 1440), 0.05, 1)
+    : 0.2;
+
+  const priority = task.priority / 5;
+
+  const hour = new Date(slot.start).getHours();
+  const curve = profile.energyCurve;
+  const energyMatch = curve.length ? curve[hour % 24] / Math.max(...curve) : 1;
+
+  const needed = Math.min(task.estimatedMinutes, profile.blockMaxMinutes);
+  const slotFit = needed > 0 ? Math.min(1, slotLen / needed) : 1;
+
+  const factors               = {
+    deadlineUrgency, priority, energyMatch, slotFit, diversityPenalty: 0,
+  };
+  const score =
+    WEIGHTS.urgency * deadlineUrgency +
+    WEIGHTS.priority * priority +
+    WEIGHTS.energy * energyMatch +
+    WEIGHTS.fit * slotFit;
+  return { score, factors };
+}
+
+function clamp(x        , lo        , hi        )         {
+  return Math.min(hi, Math.max(lo, x));
+}
+
+// ---------------------------------------------------------------------------
+// 第三步：约束校验
+// ---------------------------------------------------------------------------
+
+/** 约束校验：单次放置是否违反强度约束（重叠/日负荷/连续链/最小休息间隔） */
+function validateConstraints(
+  candidate       ,
+  existingBlocks         ,
+  profile                  ,
+)                                        {
+  const violations           = [];
+  const cs = toMin(candidate.start);
+  const ce = toMin(candidate.end);
+  const day = candidate.start.slice(0, 10);
+
+  // 1. 不重叠
+  if (existingBlocks.some((b) => {
+    const bs = toMin(b.start), be = toMin(b.end);
+    return cs < be && bs < ce;
+  })) violations.push('overlap');
+
+  // 2. 日负荷上限（仅统计当日弹性任务块）
+  const dailyLoad = existingBlocks
+    .filter((b) => b.type === 'flexible' && b.start.slice(0, 10) === day)
+    .reduce((acc, b) => acc + (toMin(b.end) - toMin(b.start)), 0);
+  if (dailyLoad + (ce - cs) > profile.dailyLoadCapMinutes) violations.push('dailyLoadCap');
+
+  // 3. 最小休息间隔：与既有块相邻时，间隔必须 ≥ minBreakMinutes
+  for (const b of existingBlocks) {
+    const bs = toMin(b.start), be = toMin(b.end);
+    const gapBefore = cs - be;
+    const gapAfter = bs - ce;
+    if (gapBefore >= 0 && gapBefore < profile.minBreakMinutes) violations.push('minBreak');
+    if (gapAfter >= 0 && gapAfter < profile.minBreakMinutes) violations.push('minBreak');
+  }
+
+  // 4. 连续工作上限：与候选块连成链后的总工作时长不得超过上限
+  const chain = chainWorkMinutes(cs, ce, existingBlocks);
+  if (chain > profile.consecutiveWorkCapMinutes) violations.push('consecutiveCap');
+
+  return { ok: violations.length === 0, violations };
+}
+
+/** 计算与 [s,e) 通过"间隔 < CHAIN_GAP_THRESHOLD"相连的所有弹性块的总工作时长（含候选块本身） */
+function chainWorkMinutes(s        , e        , blocks         )         {
+  const intervals = blocks
+    .filter((b) => b.type === 'flexible')
+    .map((b) => [toMin(b.start), toMin(b.end)]                    );
+  const set                     = [[s, e]];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const iv of intervals) {
+      if (set.some(([a, b]) => iv[0] < b + CHAIN_GAP_THRESHOLD && a - CHAIN_GAP_THRESHOLD < iv[1])) {
+        if (!set.some(([a, b]) => iv[0] === a && iv[1] === b)) { set.push(iv); changed = true; }
+      }
+    }
+  }
+  return set.reduce((acc, [a, b]) => acc + (b - a), 0);
+}
+
+// ---------------------------------------------------------------------------
+// 容量预警
+// ---------------------------------------------------------------------------
+
+                                  
+                 
+                  
+ 
+
+// ---------------------------------------------------------------------------
+// 贪心排程
+// ---------------------------------------------------------------------------
+
+let blockSeq = 0;
+function nextBlockId()         {
+  return `blk-${(++blockSeq).toString(36)}-${Date.now().toString(36).slice(-4)}`;
+}
+
+                                                               
+
+/**
+ * 贪心排程：任务按「优先级降序 → DDL 升序」逐个放置到评分最高的空闲槽。
+ * 放置后自动收缩槽位并预留最小休息间隔；连续工作达到上限时插入休息块；
+ * DDL 前容量不足时产出 CapacityWarning。
+ */
+function greedySchedule(
+  tasks        ,
+  fixedEvents              ,
+  profile                  ,
+  rangeStart        ,
+  rangeEnd        ,
+)                                                                             {
+  const blocks          = [];
+  const unplaced         = [];
+  const warnings                    = [];
+  const dailyLoad = new Map                ();       // date → 弹性块总分钟
+  const categoryLoad = new Map                ();    // date|category → 分钟
+  const sameCatCount = new Map                ();    // date|category → 已放置块数（多样性惩罚）
+
+  // 构造日期范围内的全部空闲槽
+  const slots             = [];
+  let d = rangeStart.slice(0, 10);
+  const endDate = rangeEnd.slice(0, 10);
+  for (let i = 0; d <= endDate && i < 60; i++, d = addDays(d, 1)) {
+    for (const fs of buildFreeSlots(d, fixedEvents, profile)) {
+      slots.push({ date: d, start: toMin(fs.start), end: toMin(fs.end) });
+    }
+  }
+
+  const sorted = [...tasks].sort((a, b) =>
+    b.priority - a.priority ||
+    (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999') ||
+    b.estimatedMinutes - a.estimatedMinutes);
+
+  // 预检：不可拆分且超出单块上限 → 直接无法排布
+  const remainingMap = new Map                ();
+  for (const task of sorted) {
+    remainingMap.set(task.id, task.estimatedMinutes);
+    if (!task.splittable && task.estimatedMinutes > profile.blockMaxMinutes) {
+      remainingMap.set(task.id, 0);
+      unplaced.push(task);
+      if (task.deadline) pushCapacityWarning(task, task.estimatedMinutes);
+    }
+  }
+
+  // 轮转扫描：每一轮按优先级顺序给每个未完成任务放置一个块。
+  // 这样高优先级任务优先排入，且同一任务的多个块自然被其他任务交错，
+  // 多样性惩罚（同类别当日块数越多降权越多）则引导块分散到不同日期/时段。
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const task of sorted) {
+      const remaining = remainingMap.get(task.id) ?? 0;
+      if (remaining <= 0) continue;
+      const deadlineMin = task.deadline ? toMin(task.deadline) : Number.POSITIVE_INFINITY;
+
+      // 评分并排序所有候选槽（多样性惩罚参与排序）
+      const candidates = slots
+        .map((s, idx) => {
+          const base = scorePlacement(task, { start: toIso(s.start), end: toIso(s.end) }, profile).score;
+          const diversityPenalty = 0.1 * (sameCatCount.get(`${s.date}|${task.category}`) ?? 0);
+          return { idx, s, score: base - diversityPenalty };
+        })
+        .filter(({ s }) => s.end - s.start >= Math.max(profile.blockMinMinutes,
+          task.splittable ? 0 : task.estimatedMinutes))
+        .sort((a, b) => b.score - a.score);
+
+      candidateLoop:
+      for (const { idx, s } of candidates) {
+        const date = s.date;
+        // attempt 循环：链满插入休息块后重试同一槽位
+        for (let attempt = 0; attempt < 4; attempt++) {
+          // 候选块长度
+          let chunk = task.splittable
+            ? Math.min(remaining, profile.blockMaxMinutes, s.end - s.start)
+            : task.estimatedMinutes;
+          if (chunk < profile.blockMinMinutes) continue candidateLoop;
+          // DDL 截断：块必须完完全全落在 DDL 之前
+          if (s.start + chunk > deadlineMin) chunk = deadlineMin - s.start;
+          if (chunk < profile.blockMinMinutes) continue candidateLoop;
+          // 类别配额
+          const catKey = `${date}|${task.category}`;
+          const quota = profile.categoryQuotas[task.category];
+          if (quota != null && (categoryLoad.get(catKey) ?? 0) + chunk > quota) continue candidateLoop;
+
+          const start = s.start;
+          // 连续工作上限：必要时压缩块长
+          const chain = chainWorkMinutes(start, start + chunk, blocks);
+          if (chain > profile.consecutiveWorkCapMinutes) {
+            const others = chain - chunk;
+            chunk = profile.consecutiveWorkCapMinutes - others;
+            if (chunk < profile.blockMinMinutes) {
+              // 链已满：插入一个休息块（15 分钟），为后续工作断链，然后重试本槽位
+              const breakEnd = start + CHAIN_GAP_THRESHOLD;
+              blocks.push({ id: nextBlockId(), taskId: null, start: toIso(start),
+                end: toIso(breakEnd), type: 'break', locked: false, progress: 0 });
+              s.start = breakEnd + profile.minBreakMinutes;
+              if (s.start + profile.blockMinMinutes > s.end) removeSlot(idx);
+              continue;
+            }
+          }
+          const end = start + chunk;
+          const candidate        = { id: nextBlockId(), taskId: task.id, start: toIso(start),
+            end: toIso(end), type: 'flexible', locked: false, progress: 0 };
+
+          const v = validateConstraints(candidate, blocks, profile);
+          if (!v.ok) continue candidateLoop;
+
+          // 提交放置
+          blocks.push(candidate);
+          dailyLoad.set(date, (dailyLoad.get(date) ?? 0) + chunk);
+          categoryLoad.set(catKey, (categoryLoad.get(catKey) ?? 0) + chunk);
+          sameCatCount.set(catKey, (sameCatCount.get(catKey) ?? 0) + 1);
+          // 收缩槽位并预留最小休息间隔
+          s.start = end + profile.minBreakMinutes;
+          if (s.start + profile.blockMinMinutes > s.end) removeSlot(idx);
+
+          remainingMap.set(task.id, remaining - chunk);
+          progress = true;
+          break candidateLoop;
+        }
+      }
+    }
+  }
+
+  // 收尾：仍有剩余时长未排布的任务进入 unplaced，DDL 任务产出容量预警
+  for (const task of sorted) {
+    const remaining = remainingMap.get(task.id) ?? 0;
+    if (remaining > 0) {
+      unplaced.push(task);
+      if (task.deadline) pushCapacityWarning(task, remaining);
+    }
+  }
+
+  function removeSlot(idx        ) {
+    const i = slots.findIndex((_, i2) => i2 === idx);
+    if (i >= 0) slots.splice(i, 1);
+  }
+  function pushCapacityWarning(task      , remainingMin        ) {
+    warnings.push({
+      taskId: task.id,
+      message: `「${task.title}」在 DDL ${task.deadline} 前还有 ${remainingMin} 分钟排不下，建议提高每日负荷上限、拆分任务或调整 DDL。`,
+    });
+  }
+
+  return { blocks, unplaced, capacityWarnings: warnings };
+}
+
+// ---------------------------------------------------------------------------
+// 第四步（v0.2）：增量重排
+// ---------------------------------------------------------------------------
+
+/**
+ * 增量重排：只重排「未开始且未锁定」的块；用户手动拖过的块默认加锁；
+ * 超时任务的剩余时长重新入队，优先占用最近的低价值空闲槽。
+ */
+function incrementalReschedule(
+  blocks         ,
+  tasks        ,
+  fixedEvents              ,
+  profile                  ,
+  fromTime        ,
+)                                                   {
+  // TODO(v0.2)
+  void blocks; void tasks; void fixedEvents; void profile; void fromTime;
+  return { blocks: [], warnings: [] };
+}
+
+window.Engine = { toMin, toIso, occursOn, buildFreeSlots, scorePlacement, validateConstraints, greedySchedule, incrementalReschedule };
+
+</script>
+<script>
+/**
+ * 数据层：ChangeLog（变更日志）驱动的本地存储（v0.1，零依赖）
+ *
+ * 设计要点（对应整体方案第三、六节）：
+ * - 所有写操作追加 ChangeLogEntry（唯一同步单位），单向追加；
+ * - 定期落 Snapshot（快照）收缩日志；启动时 快照 + 增量日志重放 恢复状态；
+ * - 存储后端通过 StorageAdapter 抽象：Node 文件（FileAdapter）/ 内存（MemoryAdapter）/
+ *   浏览器 localStorage（由 UI 层实现同接口）——为 v0.3 同步与 SQLite 替换留好接口。
+ *
+ * 约束：仅使用可擦除 TS 语法（无参数属性/枚举），支持 Node --experimental-strip-types 直接运行。
+ */
+
+             
+                                                                   
+                    
+
+// ---------------------------------------------------------------------------
+// 存储适配器抽象
+// ---------------------------------------------------------------------------
+
+/** 数据快照：某 seq 时刻的全量状态，用于启动加速与日志收缩 */
+                           
+              
+                
+                            
+                                     
+                                
+ 
+
+                                 
+                                                           
+                                                              
+                                                         
+                                                             
+ 
+
+/** 内存适配器：测试与浏览器兜底用 */
+class MemoryAdapter {
+  entries                  ;
+  snapshot                 ;
+
+  constructor() {
+    this.entries = [];
+    this.snapshot = null;
+  }
+
+  appendEntry(entry                )       {
+    this.entries.push(entry);
+  }
+
+  readEntries()                   {
+    return [...this.entries];
+  }
+
+  saveSnapshot(snapshot          )       {
+    this.snapshot = JSON.parse(JSON.stringify(snapshot));
+  }
+
+  loadSnapshot()                  {
+    return this.snapshot ? JSON.parse(JSON.stringify(this.snapshot)) : null;
+  }
+}
+
+/** 文件适配器：Node 端落盘（changelog.jsonl 追加 + snapshot.json）；动态 import，浏览器构建不触发 */
+class FileAdapter {
+  baseDir        ;
+
+  constructor(baseDir        ) {
+    this.baseDir = baseDir;
+  }
+
+          async fs()                                             {
+    return import('node:fs/promises');
+  }
+
+  async appendEntry(entry                )                {
+    const fs = await this.fs();
+    await fs.mkdir(this.baseDir, { recursive: true });
+    await fs.appendFile(`${this.baseDir}/changelog.jsonl`, JSON.stringify(entry) + '\n', 'utf8');
+  }
+
+  async readEntries()                            {
+    const fs = await this.fs();
+    try {
+      const raw = await fs.readFile(`${this.baseDir}/changelog.jsonl`, 'utf8');
+      return raw.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    } catch {
+      return [];
+    }
+  }
+
+  async saveSnapshot(snapshot          )                {
+    const fs = await this.fs();
+    await fs.mkdir(this.baseDir, { recursive: true });
+    await fs.writeFile(`${this.baseDir}/snapshot.json`, JSON.stringify(snapshot), 'utf8');
+  }
+
+  async loadSnapshot()                           {
+    const fs = await this.fs();
+    try {
+      return JSON.parse(await fs.readFile(`${this.baseDir}/snapshot.json`, 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PlanStore：状态仓库（重放 + 提交 + 撤销）
+// ---------------------------------------------------------------------------
+
+class PlanStore {
+  adapter                ;
+  deviceId        ;
+  seq        ;
+          tasks                   ;
+          fixedEvents                         ;
+          executionLogs                ;
+          intensity                         ;
+          history                  ;
+          idCounter        ;
+
+  constructor(adapter                , deviceId        ) {
+    this.adapter = adapter;
+    this.deviceId = deviceId;
+    this.seq = 0;
+    this.tasks = new Map();
+    this.fixedEvents = new Map();
+    this.executionLogs = [];
+    this.intensity = null;
+    this.history = [];
+    this.idCounter = 0;
+  }
+
+  /** 启动恢复：快照 + 重放增量日志（seq 大于快照的部分），然后落一次新快照收缩日志 */
+  async open()                {
+    const snap = await this.adapter.loadSnapshot();
+    if (snap) {
+      this.seq = snap.seq;
+      this.tasks = new Map(snap.tasks.map((t) => [t.id, t]));
+      this.fixedEvents = new Map(snap.fixedEvents.map((e) => [e.id, e]));
+      this.executionLogs = snap.executionLogs ?? [];
+      this.intensity = snap.intensity ?? null;
+    }
+    const entries = await this.adapter.readEntries();
+    for (const entry of entries) {
+      if (entry.seq > this.seq) {
+        this.replay(entry);
+        this.seq = entry.seq;
+      }
+      this.history.push(entry);
+    }
+    await this.saveSnapshot();
+  }
+
+  /** 重放单条日志到内存状态（纯状态变更，无 IO） */
+          replay(entry                )       {
+    switch (entry.entity) {
+      case 'task': {
+        if (entry.op === 'create') this.tasks.set(entry.entityId, entry.payload.after);
+        else if (entry.op === 'update') {
+          const t = this.tasks.get(entry.entityId);
+          if (t) Object.assign(t, entry.payload.after);
+        } else this.tasks.delete(entry.entityId);
+        break;
+      }
+      case 'fixedEvent': {
+        if (entry.op === 'create') this.fixedEvents.set(entry.entityId, entry.payload.after);
+        else if (entry.op === 'update') {
+          const ev = this.fixedEvents.get(entry.entityId);
+          if (ev) Object.assign(ev, entry.payload.after);
+        } else this.fixedEvents.delete(entry.entityId);
+        break;
+      }
+      case 'intensityProfile': {
+        if (entry.op === 'create' || entry.op === 'update') this.intensity = entry.payload.after;
+        break;
+      }
+      case 'executionLog': {
+        if (entry.op === 'create') this.executionLogs.push(entry.payload.after);
+        break;
+      }
+    }
+  }
+
+          nextId(prefix        )         {
+    return `${prefix}-${Date.now().toString(36)}-${(++this.idCounter).toString(36)}`;
+  }
+
+  /** 提交一条变更：深拷贝冻结（防对象别名污染）→ 重放内存 → 追加日志 → 记入历史 */
+          async commit(
+    entity                          ,
+    entityId        ,
+    op                      ,
+    payload         ,
+  )                          {
+    const entry                 = JSON.parse(JSON.stringify({
+      seq: ++this.seq,
+      entity, entityId, op,
+      timestamp: new Date().toISOString(),
+      deviceId: this.deviceId,
+      payload,
+    }));
+    this.replay(entry);
+    this.history.push(entry);
+    await this.adapter.appendEntry(entry);
+    return entry;
+  }
+
+  /** 落快照（收缩日志的依据） */
+  async saveSnapshot()                {
+    await this.adapter.saveSnapshot({
+      seq: this.seq,
+      tasks: [...this.tasks.values()],
+      fixedEvents: [...this.fixedEvents.values()],
+      intensity: this.intensity,
+      executionLogs: [...this.executionLogs],
+    });
+  }
+
+  // ---- 任务 ----
+
+  async addTask(input                             )                {
+    const task       = { ...input, id: this.nextId('task'), status: 'draft' };
+    await this.commit('task', task.id, 'create', { after: task });
+    return task;
+  }
+
+  async updateTask(id        , patch               )                {
+    const before = this.tasks.get(id);
+    if (!before) throw new Error(`task not found: ${id}`);
+    const after       = { ...before, ...patch };
+    await this.commit('task', id, 'update', { before, after });
+    return after;
+  }
+
+  async deleteTask(id        )                {
+    const before = this.tasks.get(id);
+    if (!before) return;
+    await this.commit('task', id, 'delete', { before });
+  }
+
+  // ---- 固定事件 ----
+
+  async addFixedEvent(input                        )                      {
+    const ev             = { ...input, id: this.nextId('evt') };
+    await this.commit('fixedEvent', ev.id, 'create', { after: ev });
+    return ev;
+  }
+
+  async removeFixedEvent(id        )                {
+    const before = this.fixedEvents.get(id);
+    if (!before) return;
+    await this.commit('fixedEvent', id, 'delete', { before });
+  }
+
+  // ---- 强度参数 / 执行记录 ----
+
+  async setIntensity(profile                  )                {
+    await this.commit('intensityProfile', profile.id, 'update', {
+      before: this.intensity, after: profile,
+    });
+  }
+
+  async addExecutionLog(input                          )                        {
+    const log               = { ...input, id: this.nextId('log') };
+    await this.commit('executionLog', log.id, 'create', { after: log });
+    return log;
+  }
+
+  // ---- 查询 ----
+
+  listTasks()         {
+    return [...this.tasks.values()];
+  }
+
+  getTask(id        )                   {
+    return this.tasks.get(id);
+  }
+
+  listFixedEvents()               {
+    return [...this.fixedEvents.values()];
+  }
+
+  getIntensity()                          {
+    return this.intensity;
+  }
+
+  /** 撤销最近一条变更（追加补偿条目，日志本身不可变；补偿条目自身不可再撤销） */
+  async undo()                   {
+    let target = -1;
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      const entry = this.history[i];
+      // 跳过强度参数（配置类操作不参与撤销）与历史补偿条目（防止来回翻转）
+      if (entry.entity === 'intensityProfile') continue;
+      if (entry.payload && entry.payload.__undoCompensation) continue;
+      target = i;
+      break;
+    }
+    if (target < 0) return false;
+    const entry = this.history[target];
+    this.history.splice(target, 1);
+    if (entry.op === 'create') {
+      await this.commit(entry.entity, entry.entityId, 'delete',
+        { before: entry.payload.after, __undoCompensation: true });
+    } else if (entry.op === 'update') {
+      await this.commit(entry.entity, entry.entityId, 'update',
+        { before: entry.payload.after, after: entry.payload.before, __undoCompensation: true });
+    } else {
+      await this.commit(entry.entity, entry.entityId, 'create',
+        { after: entry.payload.before, __undoCompensation: true });
+    }
+    await this.saveSnapshot();
+    return true;
+  }
+}
+
+window.Store = { PlanStore, MemoryAdapter, FileAdapter };
+
+</script>
+<script>
+/* 桌面计划小人 v0.1 界面逻辑（纯 JS，无依赖） */
+(function () {
+  'use strict';
+  const Engine = window.Engine;
+  const Store = window.Store;
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  function nowMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致）----
+  class LocalStorageAdapter {
+    constructor(key) { this.key = key; }
+    log() {
+      try { return JSON.parse(localStorage.getItem(this.key + '.log') || '[]'); }
+      catch (e) { return []; }
+    }
+    appendEntry(e) {
+      const a = this.log();
+      a.push(e);
+      localStorage.setItem(this.key + '.log', JSON.stringify(a));
+    }
+    readEntries() { return this.log(); }
+    saveSnapshot(s) { localStorage.setItem(this.key + '.snap', JSON.stringify(s)); }
+    loadSnapshot() {
+      try { return JSON.parse(localStorage.getItem(this.key + '.snap') || 'null'); }
+      catch (e) { return null; }
+    }
+  }
+
+  const CATEGORY_COLORS = {
+    学习: '#7c9cf5', 英语: '#f5a97c', 健身: '#7cd6a0', 阅读: '#c47cf5',
+    刷题: '#f5d47c', 报告: '#7cc4f5', 其他: '#b0b7c3',
+  };
+  const colorOf = (c) => CATEGORY_COLORS[c] || CATEGORY_COLORS['其他'];
+
+  const ENERGY_PRESETS = {
+    early: [1,1,1,1,1,1,2,3,4,5,5,4,4,3,3,3,3,2,2,2,1,1,1,1],
+    night: [1,1,1,1,2,2,2,2,3,3,3,3,3,3,3,4,4,4,5,5,5,4,3,2],
+    flat: new Array(24).fill(3),
+  };
+
+  const store = new Store.PlanStore(new LocalStorageAdapter('plan-pal'), 'browser');
+  let blocks = [];
+
+  // ---- 一句话解析（规则版；LLM 双路由在 v0.2 接入）----
+  function parseQuick(text) {
+    const t = text.trim();
+    const mh = /(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?/.exec(t);
+    const mm = /(\d+)\s*分钟/.exec(t);
+    let minutes = 60;
+    if (mh) minutes = Math.round(parseFloat(mh[1]) * 60 + (mh[2] ? 30 : 0));
+    else if (mm) minutes = parseInt(mm[1], 10);
+
+    const base = new Date();
+    const at = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T22:00`;
+    let deadline = null;
+    const iso = /(\d{4}-\d{2}-\d{2})/.exec(t);
+    const md = /(\d{1,2})月(\d{1,2})[日号]/.exec(t);
+    const rel = /(今天|明天|后天)/.exec(t);
+    const wk = /(?:周|星期)([一二三四五六日天])/.exec(t);
+    if (iso) deadline = iso[1] + 'T22:00';
+    else if (md) deadline = at(new Date(base.getFullYear(), +md[1] - 1, +md[2]));
+    else if (rel) {
+      const off = { 今天: 0, 明天: 1, 后天: 2 }[rel[1]];
+      deadline = at(new Date(base.getTime() + off * 86400000));
+    } else if (wk) {
+      const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+      let diff = (map[wk[1]] - base.getDay() + 7) % 7;
+      if (diff === 0) diff = 7;
+      deadline = at(new Date(base.getTime() + diff * 86400000));
+    }
+
+    const catMap = [['单词', '英语'], ['英语', '英语'], ['健身', '健身'], ['运动', '健身'],
+      ['刷题', '刷题'], ['习题', '刷题'], ['作业', '刷题'], ['阅读', '阅读'],
+      ['读书', '阅读'], ['实验', '报告'], ['报告', '报告'], ['复习', '学习']];
+    let category = '学习';
+    for (const [k, v] of catMap) { if (t.includes(k)) { category = v; break; } }
+
+    const title = t
+      .replace(/(\d+(?:\.\d+)?)\s*(?:个)?小时(半)?|(\d+)\s*分钟/g, '')
+      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})之?前?(完成|搞定|结束)/g, '')
+      .replace(/(今天|明天|后天|周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号]|\d{4}-\d{2}-\d{2})/g, '')
+      .trim() || '新计划';
+
+    return {
+      title, category, estimatedMinutes: minutes,
+      priority: /紧急|尽快|ASAP/.test(t) ? 5 : 3,
+      splittable: minutes >= 50, minBlockMinutes: Math.min(25, minutes),
+      deadline,
+    };
+  }
+
+  // ---- 排程 ----
+  function reschedule() {
+    const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
+    const day = todayStr();
+    const r = Engine.greedySchedule(
+      tasks, store.listFixedEvents(), store.getIntensity(),
+      day + 'T00:00', day + 'T24:00',
+    );
+    blocks = r.blocks;
+    localStorage.setItem('plan-pal.blocks', JSON.stringify(blocks));
+    renderTimeline();
+    renderWarnings(r.capacityWarnings);
+    updatePet();
+  }
+
+  function renderWarnings(list) {
+    $('warnings').innerHTML = (list || []).map((w) =>
+      `<div class="warning">⚠️ ${w.message}</div>`).join('');
+  }
+
+  // ---- 时间轴渲染（07:00-24:00）----
+  const PXH = 44; // 每小时像素
+  function renderTimeline() {
+    const tl = $('timeline');
+    const dayStart = 7 * 60, dayEnd = 24 * 60;
+    tl.style.height = ((dayEnd - dayStart) / 60) * PXH + 'px';
+    let html = '';
+    for (let h = 7; h <= 23; h++) {
+      const top = ((h * 60 - dayStart) / 60) * PXH;
+      html += `<div class="hour-line" style="top:${top}px"><span>${pad(h)}:00</span></div>`;
+    }
+    const events = store.listFixedEvents();
+    const day = todayStr();
+    for (const ev of events) {
+      if (!Engine.occursOn(ev, day)) continue;
+      const s = ev.startTime.split(':').map(Number);
+      const e = ev.endTime === '24:00' ? [24, 0] : ev.endTime.split(':').map(Number);
+      const sm = s[0] * 60 + s[1], em = e[0] * 60 + e[1];
+      if (em <= dayStart || sm >= dayEnd) continue;
+      const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
+      const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
+      html += `<div class="block fixed" style="top:${top}px;height:${h}px" title="${ev.title}">
+        <span class="b-title">🔒 ${ev.title}</span></div>`;
+    }
+    for (const b of blocks) {
+      const sm = Engine.toMin(b.start) && new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes();
+      const em = new Date(b.end).getHours() * 60 + new Date(b.end).getMinutes();
+      if (em <= dayStart || sm >= dayEnd) continue;
+      const task = b.taskId ? store.getTask(b.taskId) : null;
+      const label = b.type === 'break' ? '☕ 休息' : (task ? task.title : '计划');
+      const color = b.type === 'break' ? '#86efac' : (task ? colorOf(task.category) : '#b0b7c3');
+      const top = (Math.max(sm, dayStart) - dayStart) / 60 * PXH;
+      const h = (Math.min(em, dayEnd) - Math.max(sm, dayStart)) / 60 * PXH;
+      html += `<div class="block ${b.type}" style="top:${top}px;height:${h - 2}px;background:${color}" title="${label}">
+        <span class="b-title">${label} · ${b.start.slice(11)}-${b.end.slice(11)}</span></div>`;
+    }
+    const nm = nowMinutes();
+    if (nm > dayStart && nm < dayEnd) {
+      html += `<div class="now-line" style="top:${(nm - dayStart) / 60 * PXH}px"></div>`;
+    }
+    tl.innerHTML = html;
+    $('today-label').textContent = `（${day} 周${'日一二三四五六'[new Date().getDay()]}）`;
+  }
+
+  // ---- 任务 / 事件列表 ----
+  function renderTasks() {
+    const tasks = store.listTasks();
+    $('task-list').innerHTML = tasks.map((t) => `
+      <li class="${t.status === 'done' ? 'done' : ''}">
+        <span class="dot" style="background:${colorOf(t.category)}"></span>
+        <b>${t.title}</b>
+        <span class="meta">${t.category} · ${t.estimatedMinutes}分钟 · 优先级${t.priority}${t.deadline ? ' · DDL ' + t.deadline.replace('T', ' ') : ''}</span>
+        <span class="ops">
+          <button data-act="done" data-id="${t.id}" title="完成">✔</button>
+          <button data-act="del" data-id="${t.id}" title="删除">✕</button>
+        </span>
+      </li>`).join('') || '<li class="empty">还没有计划，用上面的一句话输入试试～</li>';
+  }
+
+  function renderEvents() {
+    const evs = store.listFixedEvents();
+    $('evt-list').innerHTML = evs.map((e) => `
+      <li><span class="dot" style="background:#94a3b8"></span>
+        <b>${e.title}</b>
+        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? '按周重复' : '仅一次'}</span>
+        <span class="ops"><button data-act="delevt" data-id="${e.id}" title="删除">✕</button></span>
+      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
+  }
+
+  // ---- 小人 ----
+  function updatePet() {
+    const pet = $('pet');
+    const bubble = $('pet-bubble');
+    const nm = nowMinutes();
+    const current = blocks.find((b) => {
+      const s = new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes();
+      const e = new Date(b.end).getHours() * 60 + new Date(b.end).getMinutes();
+      return s <= nm && nm < e;
+    });
+    if (current) {
+      const task = current.taskId ? store.getTask(current.taskId) : null;
+      const end = new Date(current.end).getHours() * 60 + new Date(current.end).getMinutes();
+      if (current.type === 'break') {
+        pet.firstChild.textContent = '🍵';
+        bubble.textContent = `休息中，还剩 ${end - nm} 分钟～`;
+      } else {
+        pet.firstChild.textContent = '🧑‍💻';
+        bubble.textContent = `正在做「${task ? task.title : '计划'}」，还剩 ${end - nm} 分钟！`;
+      }
+      return;
+    }
+    const next = blocks
+      .filter((b) => new Date(b.start).getHours() * 60 + new Date(b.start).getMinutes() > nm)
+      .sort((a, b) => a.start.localeCompare(b.start))[0];
+    pet.firstChild.textContent = '🚶';
+    bubble.textContent = next
+      ? `接下来 ${next.start.slice(11)}：${next.taskId && store.getTask(next.taskId) ? store.getTask(next.taskId).title : '计划'}`
+      : '今天的计划都完成啦，好好休息！';
+  }
+
+  // ---- 事件绑定 ----
+  function bind() {
+    $('quick-add').onclick = async () => {
+      const parsed = parseQuick($('quick-input').value);
+      $('quick-preview').textContent = `→ 「${parsed.title}」 ${parsed.category} ${parsed.estimatedMinutes}分钟 优先级${parsed.priority}${parsed.deadline ? ' DDL ' + parsed.deadline.replace('T', ' ') : ''}`;
+      await store.addTask(parsed);
+      $('quick-input').value = '';
+      renderTasks();
+      reschedule();
+    };
+    $('task-add').onclick = async () => {
+      const title = $('task-title').value.trim();
+      if (!title) return;
+      await store.addTask({
+        title,
+        category: $('task-cat').value.trim() || '其他',
+        estimatedMinutes: parseInt($('task-min').value, 10) || 60,
+        priority: parseInt($('task-pri').value, 10) || 3,
+        splittable: (parseInt($('task-min').value, 10) || 60) >= 50,
+        minBlockMinutes: 25,
+        deadline: $('task-ddl').value || null,
+      });
+      $('task-title').value = '';
+      renderTasks();
+      reschedule();
+    };
+    $('evt-add').onclick = async () => {
+      const title = $('evt-title').value.trim();
+      if (!title) return;
+      await store.addFixedEvent({
+        title,
+        startTime: $('evt-start').value || '08:00',
+        endTime: $('evt-end').value || '09:40',
+        rrule: $('evt-freq').value === 'daily' ? 'FREQ=DAILY' : '',
+        effectiveFrom: todayStr(),
+      });
+      $('evt-title').value = '';
+      renderEvents();
+      reschedule();
+    };
+    $('evt-sample').onclick = async () => {
+      const have = (t) => store.listFixedEvents().some((e) => e.title === t);
+      const day = todayStr();
+      if (!have('睡眠')) await store.addFixedEvent({ title: '睡眠', startTime: '00:00', endTime: '07:00', rrule: 'FREQ=DAILY', effectiveFrom: '2026-11-01' });
+      if (!have('高数课')) await store.addFixedEvent({ title: '高数课', startTime: '08:00', endTime: '09:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      if (!have('专业课')) await store.addFixedEvent({ title: '专业课', startTime: '10:00', endTime: '11:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      if (!have('体育课')) await store.addFixedEvent({ title: '体育课', startTime: '14:00', endTime: '15:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
+      renderEvents();
+      reschedule();
+    };
+    $('btn-reschedule').onclick = reschedule;
+    $('btn-undo').onclick = async () => {
+      if (await store.undo()) { renderTasks(); renderEvents(); reschedule(); }
+    };
+    $('btn-export').onclick = () => {
+      const data = {
+        tasks: store.listTasks(), fixedEvents: store.listFixedEvents(),
+        intensity: store.getIntensity(), blocks,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `plan-pal-${todayStr()}.json`;
+      a.click();
+    };
+    $('btn-clear').onclick = () => {
+      if (!confirm('确定清空本机所有数据？（不可恢复）')) return;
+      localStorage.removeItem('plan-pal.log');
+      localStorage.removeItem('plan-pal.snap');
+      localStorage.removeItem('plan-pal.blocks');
+      location.reload();
+    };
+    $('task-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (btn.dataset.act === 'done') {
+        await store.updateTask(id, { status: 'done' });
+      } else if (btn.dataset.act === 'del') {
+        await store.deleteTask(id);
+      }
+      renderTasks();
+      reschedule();
+    };
+    $('evt-list').onclick = async (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn || btn.dataset.act !== 'delevt') return;
+      await store.removeFixedEvent(btn.dataset.id);
+      renderEvents();
+      reschedule();
+    };
+    // 强度参数：修改即保存并重排
+    const paramIds = [['p-load', 'dailyLoadCapMinutes'], ['p-bmax', 'blockMaxMinutes'],
+      ['p-bmin', 'blockMinMinutes'], ['p-break', 'minBreakMinutes'], ['p-chain', 'consecutiveWorkCapMinutes']];
+    for (const [id, key] of paramIds) {
+      $(id).onchange = async () => {
+        const p = store.getIntensity();
+        p[key] = parseInt($(id).value, 10) || p[key];
+        await store.setIntensity(p);
+        reschedule();
+      };
+    }
+    $('p-energy').onchange = async () => {
+      const p = store.getIntensity();
+      p.energyCurve = ENERGY_PRESETS[$('p-energy').value];
+      await store.setIntensity(p);
+      reschedule();
+    };
+  }
+
+  function fillParams() {
+    const p = store.getIntensity();
+    if (!p) return;
+    $('p-load').value = p.dailyLoadCapMinutes;
+    $('p-bmax').value = p.blockMaxMinutes;
+    $('p-bmin').value = p.blockMinMinutes;
+    $('p-break').value = p.minBreakMinutes;
+    $('p-chain').value = p.consecutiveWorkCapMinutes;
+  }
+
+  // ---- 启动 ----
+  (async function init() {
+    await store.open();
+    if (!store.getIntensity()) {
+      await store.setIntensity({
+        id: 'default', effectiveDate: todayStr(),
+        dailyLoadCapMinutes: 360, blockMaxMinutes: 90, blockMinMinutes: 25,
+        minBreakMinutes: 10, consecutiveWorkCapMinutes: 120,
+        energyCurve: ENERGY_PRESETS.early, categoryQuotas: {}, nudgeLevel: 2,
+      });
+    }
+    try { blocks = JSON.parse(localStorage.getItem('plan-pal.blocks') || '[]'); } catch (e) { blocks = []; }
+    fillParams();
+    bind();
+    renderTasks();
+    renderEvents();
+    if (!blocks.length) reschedule(); else { renderTimeline(); renderWarnings([]); }
+    updatePet();
+    setInterval(updatePet, 15000);
+    setInterval(renderTimeline, 60000); // 刷新当前时间线
+  })();
+})();
+
+</script>
+</body>
+</html>

@@ -4,36 +4,35 @@
 > 任何新会话（包括电脑关机重启后）开工前，**必须先读本文件**，按「下一步」继续，
 > 并用 `git log --oneline -5` 确认最新提交。进度永不丢失：代码在磁盘、提交在 Git、状态在本文件。
 
-- **最后更新**：2026-11-09 09:45
-- **最新提交**：`b383b6e` feat(core): 排程引擎 v0.1（19/19 测试通过）
-- **当前阶段**：v0.1 单机最小可用版（进行中）
+- **最后更新**：2026-11-09 09:55
+- **当前阶段**：v0.1 单机最小可用版（收尾中）
 
 ## ✅ 已完成
 
 - [x] 整体方案设计（docs/design/整体方案.md）+ GitHub/B站调研
 - [x] 仓库骨架：README、ROADMAP、MIT、ui/pet/sync 占位
-- [x] 排程引擎 v0.1：buildFreeSlots / scorePlacement / greedySchedule（轮转扫描）/ validateConstraints / 容量预警
-- [x] 测试 19/19 通过（engine.test.ts，5 个 v0.2 用例按计划跳过）
-
-## 🚧 进行中
-
-- 数据层 store.ts（ChangeLog 驱动 + 快照，零依赖）
-- 最简界面 ui/index.html（自包含单文件，无构建依赖）
+- [x] 排程引擎 v0.1：空闲槽构造 / 多因子评分 / 轮转贪心排程 / 约束校验 / 容量预警（19/19 测试通过）
+- [x] 数据层 v0.1：ChangeLog 追加 + 快照恢复 + 撤销（StorageAdapter 抽象：Memory/File/浏览器 localStorage，5/5 测试通过）
+  - 调试修复：对象别名污染（commit 深拷贝冻结）、补偿条目防翻转、轮转扫描重构
+- [x] 构建链：core/scripts/build-browser.mjs（Node stripTypeScriptTypes → 自包含单文件 UI）
+- [x] 最简界面 v0.1：ui/index.html（时间轴 / 计划+课表增删改 / 一句话录入规则版 / 强度面板 / 小人状态气泡 / 撤销 / 导出数据）
 
 ## ⏭️ 下一步（按顺序）
 
-1. 数据层：core/src/store.ts + tests/store.test.ts → 跑通
-2. 浏览器构建脚本：core/scripts/build-browser.mjs（Node stripTypeScriptTypes → window.Engine）
-3. 最简界面：ui/src/app.js + ui/src/style.css → 生成自包含 ui/index.html（时间轴/表单/一句话录入/强度面板/小人占位）
-4. 提交 + 更新本文件
+1. **UI 实测**：浏览器打开 ui/index.html 验证全流程（载入示例课表 → 加计划 → 排程 → 完成任务），发现的问题逐一修复
+2. ICS 日历文件导入（固定事件）
+3. 周视图（多日排程展示，引擎已支持 rangeStart-rangeEnd）
+4. SQLite 落地（v0.1 数据层当前为 JSONL；Tauri 侧接 better-sqlite3 或 Rust rusqlite，接口已抽象好）
+5. v0.1 发布：打包安装包 + GitHub Releases + README 动图
+6. 进入 v0.2：小人动画（Sprite + 状态机）、自然语言 LLM 双路由、增量重排
 
 ## 🔧 环境备注（重要）
 
-- **npm 源不可用**（沙盒网络限制）：官方源 502、镜像超时。测试用本地 vitest shim（core/node_modules/vitest/index.js）+ `node --experimental-strip-types` 运行：
-  - 引擎测试：`cd core && node --experimental-strip-types --no-warnings tests/engine.test.ts`
-  - 数据层测试：`cd core && node --experimental-strip-types --no-warnings tests/store.test.ts`
-- Node v22.22.2，支持 stripTypeScriptTypes（构建浏览器包用）。
-- 网络恢复后：`cd core && npm install --registry=https://registry.npmmirror.com` 切回官方 vitest（接口兼容，shim 可删）。
+- **npm 源不可用**（沙盒网络限制）。测试用本地 vitest shim（core/node_modules/vitest/index.js）：
+  - `cd core && node --experimental-strip-types --no-warnings tests/engine.test.ts`
+  - `cd core && node --experimental-strip-types --no-warnings tests/store.test.ts`
+- **构建 UI**：`node core/scripts/build-browser.mjs` → 生成 ui/index.html（自包含 45KB，双击即开）
+- Node v22.22.2。网络恢复后：`cd core && npm install --registry=https://registry.npmmirror.com` 切回官方 vitest（shim 可删）。
 
 ## 📋 断点续做协议（新会话必读）
 

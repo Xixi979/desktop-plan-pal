@@ -4,12 +4,11 @@
 
 ## v0.1 — 单机最小可用版（当前阶段）
 
-- [x] 数据层：SQLite + ChangeLog 追加表（一开始就设计进去）
-  - [x] ChangeLog 数据模型已定义（SQLite 落地待做）
+- [x] 数据层：ChangeLog 追加 + 快照恢复（StorageAdapter 抽象，Memory/File/浏览器 localStorage 三后端）
 - [x] 排程引擎：空闲槽构造 → 多因子评分 → 贪心放置 → 约束校验
   - [x] 通过 `core/tests/engine.test.ts` 全部用例（19/19，v0.2 重排用例按计划跳过）
-- [ ] 最简界面：日/周视图 + 计划列表 + 增删改
-- [ ] 固定事件导入：ICS 文件 + 手动录入
+- [x] 最简界面（日视图）：时间轴 + 计划/课表增删改 + 一句话录入（规则版）+ 强度面板 + 小人占位 + 数据导出
+  - 自包含单文件 ui/index.html（`node core/scripts/build-browser.mjs` 生成，零依赖可双击打开）
 - [ ] 小人：静态占位图（此阶段不做动画）
 - [ ] 发布：GitHub Releases 首个安装包
 
