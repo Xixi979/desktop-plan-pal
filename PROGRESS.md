@@ -4,8 +4,13 @@
 > 任何新会话（包括电脑关机重启后）开工前，**必须先读本文件**，按「下一步」继续，
 > 并用 `git log --oneline -5` 确认最新提交。进度永不丢失：代码在磁盘、提交在 Git、状态在本文件。
 
-- **最后更新**：2026-11-09 17:22
-- **当前阶段**：✅ v0.2.0 已发布 GitHub（PAT 方式，全部历史已推送）
+- **最后更新**：2026-11-09 17:35
+- **当前阶段**：v0.2 增量重排完成并推送（062bfff）
+  - engine.incrementalReschedule 从 TODO 桩落地：保留已结束/进行中/锁定块；释放未来未锁定块；剩余时长=总时长−保留块占用；保留块未来段转一次性固定占用防重叠；当天 fromTime 前整体封禁（防止排进过去）；7 天排程窗口
+  - UI 接入：加任务（一句话/手动/图片/链接）与达标勾选状态变化 → 增量重排（不打乱当前安排）；课表增删/撤销/导入/强度参数 → 仍全量重排
+  - vitest shim 补 toBeDefined；engine 测试 19→24（新增 5 用例：保留/剩余入队/不重叠/幂等/参数收紧）
+  - 自测 12 步全通过（新增「增量重排生效」）；ES2020 真实残留无
+  - 测试 24+7+5+5 全绿；已推送 GitHub
   - 仓库：https://github.com/Xixi979/desktop-plan-pal（Public，23+ 提交，main 分支）
   - Release v0.2.0：含下载资产 desktop-plan-pal-v0.2.0.html（https://github.com/Xixi979/desktop-plan-pal/releases/tag/v0.2.0）
   - 凭据：PAT 存于 ~/.git-credentials（credential.helper store），后续 push 免密；git remote origin 已配置
@@ -51,7 +56,7 @@
 ## ⏭️ 下一步（按顺序）
 
 1. SQLite 落地：待 npm 源可用（装 better-sqlite3）或 Tauri 打包时接 rusqlite；接口已抽象好（StorageAdapter）
-2. v0.2 后续：自然语言 LLM 双路由、📂 打开文件夹接 Tauri、增量重排；小人动画已完成（063be81）
+2. v0.2 后续：自然语言 LLM 双路由（本地规则增强 + LLM 接口预留）、📂 打开文件夹接 Tauri；增量重排已完成（062bfff）
 3. 用户试用 v0.2.0 收集反馈：认准页头 v0.2.0；Release 资产或 ui/桌面计划小人-v0.2.0.html 均可
 
 ## 🔧 环境备注（重要）
