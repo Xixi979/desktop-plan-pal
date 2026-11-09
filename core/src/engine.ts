@@ -417,6 +417,13 @@ export function greedySchedule(
 /**
  * 增量重排：只重排「未开始且未锁定」的块；用户手动拖过的块默认加锁；
  * 超时任务的剩余时长重新入队，优先占用最近的低价值空闲槽。
+ *
+ * 规则：
+ *  - 已结束（end ≤ fromTime）、进行中（跨 fromTime）、锁定（locked）的块一律保留；
+ *  - 其余未来未锁定块被释放，其任务按「总时长 − 保留块已占时长」重新入队；
+ *  - 保留块中未来仍占时的部分（进行中段、锁定块）转为一次性固定占用，
+ *    避免新块与之重叠；
+ *  - 排程窗口为 fromTime 起 7 天；容量预警沿用贪心排程的产出。
  */
 export function incrementalReschedule(
   blocks: Block[],
@@ -425,7 +432,77 @@ export function incrementalReschedule(
   profile: IntensityProfile,
   fromTime: string,
 ): { blocks: Block[]; warnings: CapacityWarning[] } {
-  // TODO(v0.2)
-  void blocks; void tasks; void fixedEvents; void profile; void fromTime;
-  return { blocks: [], warnings: [] };
+  const keep: Block[] = [];
+  const freedTasks = new Set<string>();
+
+  // 1. 分拣现有块：保留 vs 释放
+  for (const b of blocks) {
+    const started = b.start < fromTime && b.end > fromTime; // 进行中（含跨 fromTime）
+    if (b.end <= fromTime || started || b.locked) {
+      keep.push(b);
+    } else if (b.taskId) {
+      freedTasks.add(b.taskId);
+    }
+  }
+
+  // 2. 计算各任务剩余时长：总时长 − 保留块已占时长
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
+  const booked = new Map<string, number>();
+  for (const b of keep) {
+    if (!b.taskId) continue;
+    if (!taskMap.has(b.taskId)) continue;
+    const mins = Math.round((new Date(b.end).getTime() - new Date(b.start).getTime()) / 60000);
+    booked.set(b.taskId, (booked.get(b.taskId) || 0) + mins);
+  }
+  const toSchedule: Task[] = [];
+  for (const t of tasks) {
+    if (t.status === 'done' || t.status === 'cancelled') continue;
+    const rem = t.estimatedMinutes - (booked.get(t.id) || 0);
+    if (rem <= 0) continue;
+    // 只有「被释放过块」或「完全没有块」的任务才需要排入
+    if (!freedTasks.has(t.id) && (booked.get(t.id) || 0) > 0) continue;
+    toSchedule.push(Object.assign({}, t, { estimatedMinutes: rem }));
+  }
+
+  // 3. 保留块中未来仍占时的部分 → 一次性固定占用（防新块重叠）
+  const occupyFixed: FixedEvent[] = [];
+  // 3a. 当天 fromTime 之前整体占用：防止新块被排进「今天已过去」的时段
+  //    （buildFreeSlots 按全天构造空闲槽，必须封住过去）
+  if (fromTime.slice(11, 16) > '00:00') {
+    occupyFixed.push({
+      id: 'occ-past', title: '过去时段',
+      startTime: '00:00', endTime: fromTime.slice(11, 16),
+      rrule: '', effectiveFrom: fromTime.slice(0, 10),
+    });
+  }
+  // 3b. 保留块的剩余占用段
+  for (const b of keep) {
+    if (b.end <= fromTime) continue;
+    const clipStart = b.start > fromTime ? b.start : fromTime;
+    const sd = clipStart.slice(0, 10);
+    const ed = b.end.slice(0, 10);
+    const st = clipStart.slice(11, 16);
+    const et = ed === sd ? b.end.slice(11, 16) : '24:00';
+    if (st >= et) continue;
+    occupyFixed.push({
+      id: `occ-${b.id}`,
+      title: '已排块占用',
+      startTime: st,
+      endTime: et,
+      rrule: '',
+      effectiveFrom: sd,
+    });
+  }
+
+  // 4. 从 fromTime 起贪心排剩余任务（7 天窗口）
+  const rangeEnd = addDays(fromTime.slice(0, 10), 7) + 'T24:00';
+  const r = greedySchedule(
+    toSchedule,
+    fixedEvents.concat(occupyFixed),
+    profile,
+    fromTime,
+    rangeEnd,
+  );
+
+  return { blocks: keep.concat(r.blocks), warnings: r.capacityWarnings };
 }

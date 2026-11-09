@@ -376,7 +376,7 @@
       $('img-title').value = '';
       $('img-file').value = '';
       renderImgThumbs();
-      renderTasks(); reschedule();
+      renderTasks(); reschedule('incremental');
     }
   }
 
@@ -426,7 +426,7 @@
       $('link-note').value = '';
       $('link-title').value = '';
       renderLinkList();
-      renderTasks(); reschedule();
+      renderTasks(); reschedule('incremental');
     }
   }
 
@@ -452,7 +452,7 @@
     await store.updateTask(tid, { checklist: list }); // 达标自动完成/回退规则在数据层统一生效
     const nowDone = (store.getTask(tid) || {}).status === 'done';
     renderTasks();
-    if (wasDone !== nowDone) reschedule(); // 完成状态变化后腾出/释放时间，重排剩余计划
+    if (wasDone !== nowDone) reschedule('incremental'); // 完成状态变化后腾出/释放时间，增量重排剩余计划
   }
 
   // ---- 文件夹 ----
@@ -469,9 +469,24 @@
   }
 
   // ---- 排程 ----
-  function reschedule() {
+  // mode='incremental'：增量重排（保留已开始/锁定块，只排剩余），用于新增任务与达标状态变化；
+  // 默认全量重排：用于课表变更、撤销、导入、参数调整等结构性变化。
+  function reschedule(mode) {
     const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
     const day = todayStr();
+    if (mode === 'incremental' && blocks.length) {
+      const now = new Date();
+      const from = day + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+      const r = Engine.incrementalReschedule(
+        blocks, tasks, store.listFixedEvents(), store.getIntensity(), from,
+      );
+      blocks = r.blocks;
+      LS.set('plan-pal.blocks', JSON.stringify(blocks));
+      renderTimeline();
+      renderWarnings(r.warnings);
+      updatePet();
+      return;
+    }
     const r = Engine.greedySchedule(
       tasks, store.listFixedEvents(), store.getIntensity(),
       day + 'T00:00', day + 'T24:00',
@@ -755,7 +770,7 @@
       }
       $('quick-input').value = '';
       renderTasks();
-      reschedule();
+      reschedule('incremental');
     };
     // 手动表单添加（标题/类别/分钟/优先级/DDL）
     $('task-add').onclick = async () => {
@@ -776,7 +791,7 @@
       });
       $('task-title').value = '';
       renderTasks();
-      reschedule();
+      reschedule('incremental');
     };
     // 通道二：图片（多选 / 多拖 / 多粘贴）
     $('img-drop').onclick = () => $('img-file').click();

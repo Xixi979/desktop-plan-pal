@@ -64,6 +64,14 @@
     if (!document.getElementById('task-list').innerHTML.includes('提示测试')) throw new Error('未添加');
   });
 
+  // v0.2 增量重排：新加任务后时间轴应出现排程块（增量路径走通）
+  await tryStep('增量重排生效', async () => {
+    document.getElementById('task-title').value = '增量自测';
+    document.getElementById('task-add').click(); await sleep(600);
+    const tl = document.getElementById('timeline');
+    if (!tl || !tl.querySelector('.block')) throw new Error('时间轴无排程块');
+  });
+
   // v0.2 小人状态机
   await tryStep('小人SVG渲染', async () => {
     if (!document.querySelector('#pet .pet-svg')) throw new Error('SVG未渲染');

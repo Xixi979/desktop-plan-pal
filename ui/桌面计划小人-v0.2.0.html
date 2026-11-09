@@ -245,7 +245,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
 </script>
 <div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.2.0 · 2026-11-09 09:18</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.2.0 · 2026-11-09 09:27</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -792,6 +792,13 @@ function greedySchedule(
 /**
  * 增量重排：只重排「未开始且未锁定」的块；用户手动拖过的块默认加锁；
  * 超时任务的剩余时长重新入队，优先占用最近的低价值空闲槽。
+ *
+ * 规则：
+ *  - 已结束（end ≤ fromTime）、进行中（跨 fromTime）、锁定（locked）的块一律保留；
+ *  - 其余未来未锁定块被释放，其任务按「总时长 − 保留块已占时长」重新入队；
+ *  - 保留块中未来仍占时的部分（进行中段、锁定块）转为一次性固定占用，
+ *    避免新块与之重叠；
+ *  - 排程窗口为 fromTime 起 7 天；容量预警沿用贪心排程的产出。
  */
 function incrementalReschedule(
   blocks         ,
@@ -800,9 +807,79 @@ function incrementalReschedule(
   profile                  ,
   fromTime        ,
 )                                                   {
-  // TODO(v0.2)
-  void blocks; void tasks; void fixedEvents; void profile; void fromTime;
-  return { blocks: [], warnings: [] };
+  const keep          = [];
+  const freedTasks = new Set        ();
+
+  // 1. 分拣现有块：保留 vs 释放
+  for (const b of blocks) {
+    const started = b.start < fromTime && b.end > fromTime; // 进行中（含跨 fromTime）
+    if (b.end <= fromTime || started || b.locked) {
+      keep.push(b);
+    } else if (b.taskId) {
+      freedTasks.add(b.taskId);
+    }
+  }
+
+  // 2. 计算各任务剩余时长：总时长 − 保留块已占时长
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
+  const booked = new Map                ();
+  for (const b of keep) {
+    if (!b.taskId) continue;
+    if (!taskMap.has(b.taskId)) continue;
+    const mins = Math.round((new Date(b.end).getTime() - new Date(b.start).getTime()) / 60000);
+    booked.set(b.taskId, (booked.get(b.taskId) || 0) + mins);
+  }
+  const toSchedule         = [];
+  for (const t of tasks) {
+    if (t.status === 'done' || t.status === 'cancelled') continue;
+    const rem = t.estimatedMinutes - (booked.get(t.id) || 0);
+    if (rem <= 0) continue;
+    // 只有「被释放过块」或「完全没有块」的任务才需要排入
+    if (!freedTasks.has(t.id) && (booked.get(t.id) || 0) > 0) continue;
+    toSchedule.push(Object.assign({}, t, { estimatedMinutes: rem }));
+  }
+
+  // 3. 保留块中未来仍占时的部分 → 一次性固定占用（防新块重叠）
+  const occupyFixed               = [];
+  // 3a. 当天 fromTime 之前整体占用：防止新块被排进「今天已过去」的时段
+  //    （buildFreeSlots 按全天构造空闲槽，必须封住过去）
+  if (fromTime.slice(11, 16) > '00:00') {
+    occupyFixed.push({
+      id: 'occ-past', title: '过去时段',
+      startTime: '00:00', endTime: fromTime.slice(11, 16),
+      rrule: '', effectiveFrom: fromTime.slice(0, 10),
+    });
+  }
+  // 3b. 保留块的剩余占用段
+  for (const b of keep) {
+    if (b.end <= fromTime) continue;
+    const clipStart = b.start > fromTime ? b.start : fromTime;
+    const sd = clipStart.slice(0, 10);
+    const ed = b.end.slice(0, 10);
+    const st = clipStart.slice(11, 16);
+    const et = ed === sd ? b.end.slice(11, 16) : '24:00';
+    if (st >= et) continue;
+    occupyFixed.push({
+      id: `occ-${b.id}`,
+      title: '已排块占用',
+      startTime: st,
+      endTime: et,
+      rrule: '',
+      effectiveFrom: sd,
+    });
+  }
+
+  // 4. 从 fromTime 起贪心排剩余任务（7 天窗口）
+  const rangeEnd = addDays(fromTime.slice(0, 10), 7) + 'T24:00';
+  const r = greedySchedule(
+    toSchedule,
+    fixedEvents.concat(occupyFixed),
+    profile,
+    fromTime,
+    rangeEnd,
+  );
+
+  return { blocks: keep.concat(r.blocks), warnings: r.capacityWarnings };
 }
 
 window.Engine = { toMin, toIso, occursOn, buildFreeSlots, scorePlacement, validateConstraints, greedySchedule, incrementalReschedule };
@@ -1851,7 +1928,7 @@ window.Ics = { parseIcs };
       $('img-title').value = '';
       $('img-file').value = '';
       renderImgThumbs();
-      renderTasks(); reschedule();
+      renderTasks(); reschedule('incremental');
     }
   }
 
@@ -1901,7 +1978,7 @@ window.Ics = { parseIcs };
       $('link-note').value = '';
       $('link-title').value = '';
       renderLinkList();
-      renderTasks(); reschedule();
+      renderTasks(); reschedule('incremental');
     }
   }
 
@@ -1927,7 +2004,7 @@ window.Ics = { parseIcs };
     await store.updateTask(tid, { checklist: list }); // 达标自动完成/回退规则在数据层统一生效
     const nowDone = (store.getTask(tid) || {}).status === 'done';
     renderTasks();
-    if (wasDone !== nowDone) reschedule(); // 完成状态变化后腾出/释放时间，重排剩余计划
+    if (wasDone !== nowDone) reschedule('incremental'); // 完成状态变化后腾出/释放时间，增量重排剩余计划
   }
 
   // ---- 文件夹 ----
@@ -1944,9 +2021,24 @@ window.Ics = { parseIcs };
   }
 
   // ---- 排程 ----
-  function reschedule() {
+  // mode='incremental'：增量重排（保留已开始/锁定块，只排剩余），用于新增任务与达标状态变化；
+  // 默认全量重排：用于课表变更、撤销、导入、参数调整等结构性变化。
+  function reschedule(mode) {
     const tasks = store.listTasks().filter((t) => t.status !== 'done' && t.status !== 'cancelled');
     const day = todayStr();
+    if (mode === 'incremental' && blocks.length) {
+      const now = new Date();
+      const from = day + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+      const r = Engine.incrementalReschedule(
+        blocks, tasks, store.listFixedEvents(), store.getIntensity(), from,
+      );
+      blocks = r.blocks;
+      LS.set('plan-pal.blocks', JSON.stringify(blocks));
+      renderTimeline();
+      renderWarnings(r.warnings);
+      updatePet();
+      return;
+    }
     const r = Engine.greedySchedule(
       tasks, store.listFixedEvents(), store.getIntensity(),
       day + 'T00:00', day + 'T24:00',
@@ -2230,7 +2322,7 @@ window.Ics = { parseIcs };
       }
       $('quick-input').value = '';
       renderTasks();
-      reschedule();
+      reschedule('incremental');
     };
     // 手动表单添加（标题/类别/分钟/优先级/DDL）
     $('task-add').onclick = async () => {
@@ -2251,7 +2343,7 @@ window.Ics = { parseIcs };
       });
       $('task-title').value = '';
       renderTasks();
-      reschedule();
+      reschedule('incremental');
     };
     // 通道二：图片（多选 / 多拖 / 多粘贴）
     $('img-drop').onclick = () => $('img-file').click();

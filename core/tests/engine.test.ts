@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  buildFreeSlots, greedySchedule, scorePlacement, validateConstraints,
+  buildFreeSlots, greedySchedule, incrementalReschedule, scorePlacement, validateConstraints,
 } from '../src/engine.ts';
 import type { Block, FixedEvent, IntensityProfile, Task } from '../src/types.ts';
 
@@ -280,11 +280,82 @@ describe('容量预警（DDL 容量复检）', () => {
 });
 
 describe('incrementalReschedule 增量重排（v0.2 实现）', () => {
-  it.skip('TODO(v0.2)：锁定块不动：新增任务重排后，locked=true 的块 start/end 不变', () => {});
-  it.skip('TODO(v0.2)：已完成/进行中的块不动，只重排未来未锁定块', () => {});
-  it.skip('TODO(v0.2)：超时顺延：某块未完成 → 剩余时长重新入队', () => {});
-  it.skip('TODO(v0.2)：强度参数收紧后重排 → 日负荷不超新上限', () => {});
-  it.skip('TODO(v0.2)：幂等性：无新增/变更时调用重排 → 输出与输入一致', () => {});
+  const FROM = '2026-11-09T14:00';
+
+  /** 手工构造已排布局：已结束 / 进行中 / 未来释放 / 未来锁定 / 未来休息 */
+  function layout(): { blocks: Block[]; tasks: Task[] } {
+    const t1 = mkTask({ id: 't1', title: '已结束任务', estimatedMinutes: 90, priority: 3, status: 'scheduled' });
+    const t2 = mkTask({ id: 't2', title: '进行中任务', estimatedMinutes: 120, priority: 4, status: 'scheduled' });
+    const t3 = mkTask({ id: 't3', title: '锁定任务', estimatedMinutes: 60, priority: 2, status: 'scheduled' });
+    const t4 = mkTask({ id: 't4', title: '新加任务', estimatedMinutes: 45, priority: 5, status: 'scheduled' });
+    const blocks: Block[] = [
+      { id: 'b1', taskId: 't1', start: '2026-11-09T09:00', end: '2026-11-09T10:00', type: 'flexible', locked: false, progress: 1 },  // 已结束
+      { id: 'b2', taskId: 't2', start: '2026-11-09T13:30', end: '2026-11-09T14:30', type: 'flexible', locked: false, progress: .5 }, // 进行中
+      { id: 'b3', taskId: 't2', start: '2026-11-09T15:00', end: '2026-11-09T16:00', type: 'flexible', locked: false, progress: 0 },  // 未来 → 释放
+      { id: 'b4', taskId: 't3', start: '2026-11-09T16:00', end: '2026-11-09T17:00', type: 'flexible', locked: true, progress: 0 },   // 未来但锁定
+      { id: 'b5', taskId: null, start: '2026-11-09T15:00', end: '2026-11-09T15:30', type: 'break', locked: false, progress: 0 },     // 未来休息 → 释放
+    ];
+    return { blocks, tasks: [t1, t2, t3, t4] };
+  }
+
+  it('已完成/进行中/锁定的块保留原样，未来未锁定块被释放重排', () => {
+    const { blocks, tasks } = layout();
+    const r = incrementalReschedule(blocks, tasks, [SLEEP], PROFILE, FROM);
+    // b1/b2/b4 原样保留
+    for (const id of ['b1', 'b2', 'b4']) {
+      const kept = r.blocks.find((b) => b.id === id);
+      const orig = blocks.find((b) => b.id === id)!;
+      expect(kept).toBeDefined();
+      expect(kept!.start).toBe(orig.start);
+      expect(kept!.end).toBe(orig.end);
+    }
+    // b3/b5 被释放（不以其原 id 出现）
+    expect(r.blocks.find((b) => b.id === 'b3')).toBeUndefined();
+    expect(r.blocks.find((b) => b.id === 'b5')).toBeUndefined();
+  });
+
+  it('剩余时长重新入队：t2 只补排未完成部分，新任务 t4 全量排入', () => {
+    const { blocks, tasks } = layout();
+    const r = incrementalReschedule(blocks, tasks, [SLEEP], PROFILE, FROM);
+    // t2：总 120 − 保留块占用 60 = 60 分钟新排
+    const t2New = r.blocks.filter((b) => b.taskId === 't2' && b.type === 'flexible' && b.start >= FROM);
+    const t2NewMin = t2New.reduce((s, b) => s + Math.round((new Date(b.end).getTime() - new Date(b.start).getTime()) / 60000), 0);
+    expect(t2NewMin).toBe(60);
+    // t4：全新 45 分钟
+    const t4Min = r.blocks.filter((b) => b.taskId === 't4').reduce((s, b) => s + Math.round((new Date(b.end).getTime() - new Date(b.start).getTime()) / 60000), 0);
+    expect(t4Min).toBe(45);
+    // t1（已结束块占用 60 < 90，但未被释放）与 t3（锁定已占满）不产生新块
+    expect(r.blocks.filter((b) => b.taskId === 't1' && b.start >= FROM)).toHaveLength(0);
+    expect(r.blocks.filter((b) => b.taskId === 't3' && b.id !== 'b4')).toHaveLength(0);
+  });
+
+  it('新块与保留块互不重叠，且不早于 fromTime', () => {
+    const { blocks, tasks } = layout();
+    const r = incrementalReschedule(blocks, tasks, [SLEEP], PROFILE, FROM);
+    const work = r.blocks.filter((b) => b.type === 'flexible').sort((a, b) => a.start.localeCompare(b.start));
+    for (const b of work) expect(b.start >= FROM || blocks.some((o) => o.id === b.id)).toBe(true);
+    for (let i = 1; i < work.length; i++) {
+      expect(work[i].start >= work[i - 1].end).toBe(true); // 允许紧贴，不允许重叠
+    }
+  });
+
+  it('幂等性：对重排结果再跑一次 → 输出与输入一致（不再新增块）', () => {
+    const { blocks, tasks } = layout();
+    const once = incrementalReschedule(blocks, tasks, [SLEEP], PROFILE, FROM);
+    const twice = incrementalReschedule(once.blocks, tasks, [SLEEP], PROFILE, FROM);
+    expect(twice.blocks.length).toBe(once.blocks.length);
+  });
+
+  it('强度参数收紧后增量重排 → 单块不超过新的 blockMaxMinutes', () => {
+    const { blocks, tasks } = layout();
+    const tight = { ...PROFILE, blockMaxMinutes: 30 };
+    const r = incrementalReschedule(blocks, tasks, [SLEEP], tight, FROM);
+    for (const b of r.blocks) {
+      if (b.type !== 'flexible' || blocks.some((o) => o.id === b.id)) continue; // 只检查新排块
+      const mins = Math.round((new Date(b.end).getTime() - new Date(b.start).getTime()) / 60000);
+      expect(mins).toBeLessThanOrEqual(30);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
