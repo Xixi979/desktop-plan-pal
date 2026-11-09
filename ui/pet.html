@@ -467,14 +467,49 @@ html.in-electron, body.in-electron { background: transparent !important; border-
     if (e.key === 'plan-pal.blocks' || e.key === 'plan-pal.snap') tick();
   });
 
-  // 点击小人 → 打开主计划页（Electron 壳内由 main.js 拦截为同 session 新窗口）
-  function bindOpen() {
+  /**
+   * 桌宠交互（Electron 壳）：
+   * - 按住小人拖动 → IPC 增量移动窗口（手动实现，保留双击事件）
+   * - 双击小人 → 打开主计划页
+   * - 窗口其余空白区域仍用 CSS app-region 拖动
+   */
+  function setupDragAndOpen() {
     var pet = document.getElementById('pet');
     if (!pet) return;
-    pet.style.cursor = 'pointer';
-    pet.addEventListener('click', function () {
-      try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
-    });
+    var dragging = false, moved = false, lastX = 0, lastY = 0;
+
+    if (window.PetNative) {
+      pet.style.cursor = 'grab';
+      pet.addEventListener('mousedown', function (e) {
+        if (e.button !== 0) return;
+        dragging = true; moved = false;
+        lastX = e.screenX; lastY = e.screenY;
+        pet.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', function (e) {
+        if (!dragging) return;
+        var dx = e.screenX - lastX, dy = e.screenY - lastY;
+        if (!moved && Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+        if (moved) {
+          window.PetNative.moveBy(dx, dy);
+          lastX = e.screenX; lastY = e.screenY;
+        }
+      });
+      window.addEventListener('mouseup', function () {
+        dragging = false;
+        pet.style.cursor = 'grab';
+      });
+      // 双击打开主页面（单击不再打开）
+      pet.addEventListener('dblclick', function () {
+        try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
+      });
+    } else {
+      // 非 Electron（Edge app 模式）：保留单击打开
+      pet.addEventListener('click', function () {
+        try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
+      });
+    }
   }
 
   /** Electron 壳适配：透明背景 + 整窗拖动 + 小人右上角悬停关闭按钮 */
@@ -502,7 +537,7 @@ html.in-electron, body.in-electron { background: transparent !important; border-
   function boot() {
     setupElectron();
     Pet.mount();
-    bindOpen();
+    setupDragAndOpen();
     tick();
     setInterval(tick, 30 * 1000);
   }

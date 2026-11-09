@@ -5,11 +5,19 @@
  * - 主页面（index.html）在本壳内打开时与桌宠同 localStorage → 数据实时联动
  * - 拖动：按住桌宠空白区域拖动；点击小人本体打开主计划页
  */
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
+
+// 桌宠拖拽：渲染进程发增量，主进程移动对应窗口
+ipcMain.on('pet-move', (event, dx, dy) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || typeof dx !== 'number' || typeof dy !== 'number') return;
+  const [x, y] = win.getPosition();
+  win.setPosition(x + Math.round(dx), y + Math.round(dy));
+});
 
 /**
  * 数据迁移：--import <json 文件>
@@ -64,7 +72,7 @@ function createPetWindow() {
     resizable: true,
     minWidth: 200,
     minHeight: 260,
-    webPreferences: { sandbox: true },
+    webPreferences: { sandbox: true, preload: path.join(__dirname, 'preload.js') },
   });
   // 置顶到最高层级（高于普通窗口，低于任务管理器）
   pet.setAlwaysOnTop(true, 'screen-saver');
