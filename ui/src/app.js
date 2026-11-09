@@ -22,22 +22,22 @@
     }[c]));
   }
 
-  // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致）----
+  // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致；经 LS 安全读写）----
   class LocalStorageAdapter {
     constructor(key) { this.key = key; }
     log() {
-      try { return JSON.parse(localStorage.getItem(this.key + '.log') || '[]'); }
+      try { return JSON.parse(LS.get(this.key + '.log') || '[]'); }
       catch (e) { return []; }
     }
     appendEntry(e) {
       const a = this.log();
       a.push(e);
-      localStorage.setItem(this.key + '.log', JSON.stringify(a));
+      LS.set(this.key + '.log', JSON.stringify(a));
     }
     readEntries() { return this.log(); }
-    saveSnapshot(s) { localStorage.setItem(this.key + '.snap', JSON.stringify(s)); }
+    saveSnapshot(s) { LS.set(this.key + '.snap', JSON.stringify(s)); }
     loadSnapshot() {
-      try { return JSON.parse(localStorage.getItem(this.key + '.snap') || 'null'); }
+      try { return JSON.parse(LS.get(this.key + '.snap') || 'null'); }
       catch (e) { return null; }
     }
   }
@@ -56,6 +56,36 @@
 
   const store = new Store.PlanStore(new LocalStorageAdapter('plan-pal'), 'browser');
   let blocks = [];
+
+  // ---- 安全存储：预览沙盒/隐私模式下 localStorage 可能被禁用（访问即抛错），
+  //      统一经 LS 读写，不可用时自动降级为内存存储（本次会话数据不持久化）----
+  const LS_MEM = {};
+  const LS = {
+    ok: (() => {
+      try { localStorage.setItem('__plan_pal_test', '1'); localStorage.removeItem('__plan_pal_test'); return true; }
+      catch (e) { return false; }
+    })(),
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return k in LS_MEM ? LS_MEM[k] : null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { LS_MEM[k] = v; } },
+    remove(k) { try { localStorage.removeItem(k); } catch (e) { delete LS_MEM[k]; } },
+  };
+  if (!LS.ok) {
+    window.addEventListener('DOMContentLoaded', () => {
+      const b = $('pet-bubble');
+      if (b) b.textContent = '⚠️ 当前环境不支持本地存储，数据仅本次会话有效（双击本地文件打开即可持久化）';
+    });
+  }
+  // ---- 可见错误横幅：任何脚本错误都显示在页面顶部，避免"静默失灵"----
+  window.onerror = (msg, src, line) => {
+    let el = document.getElementById('err-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'err-banner';
+      document.body.prepend(el);
+    }
+    el.textContent = `⚠️ 页面脚本错误：${msg}（第 ${line || '?'} 行）`;
+    return false;
+  };
 
   // ---- 一句话解析（规则版；LLM 双路由在 v0.2 接入）----
   function parseQuick(text) {
@@ -271,7 +301,7 @@
       day + 'T00:00', day + 'T24:00',
     );
     blocks = r.blocks;
-    localStorage.setItem('plan-pal.blocks', JSON.stringify(blocks));
+    LS.set('plan-pal.blocks', JSON.stringify(blocks));
     renderTimeline();
     renderWarnings(r.capacityWarnings);
     updatePet();
@@ -547,9 +577,9 @@
     };
     $('btn-clear').onclick = () => {
       if (!confirm('确定清空本机所有数据？（不可恢复）')) return;
-      localStorage.removeItem('plan-pal.log');
-      localStorage.removeItem('plan-pal.snap');
-      localStorage.removeItem('plan-pal.blocks');
+      LS.remove('plan-pal.log');
+      LS.remove('plan-pal.snap');
+      LS.remove('plan-pal.blocks');
       location.reload();
     };
     // 强度参数：修改即保存并重排
@@ -592,7 +622,7 @@
         energyCurve: ENERGY_PRESETS.early, categoryQuotas: {}, nudgeLevel: 2,
       });
     }
-    try { blocks = JSON.parse(localStorage.getItem('plan-pal.blocks') || '[]'); } catch (e) { blocks = []; }
+    try { blocks = JSON.parse(LS.get('plan-pal.blocks') || '[]'); } catch (e) { blocks = []; }
     fillParams();
     bind();
     renderTasks();
