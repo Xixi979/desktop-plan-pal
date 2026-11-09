@@ -518,6 +518,53 @@
     $('today-label').textContent = `（${day} 周${'日一二三四五六'[new Date().getDay()]}）`;
   }
 
+  // ---- 周视图（本周一~周日，7 列日程概览）----
+  let weekMode = false;
+  function weekDates() {
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7; // 周一=0
+    const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    });
+  }
+  function renderWeek() {
+    const days = weekDates();
+    const events = store.listFixedEvents();
+    $('week-view').innerHTML = days.map((day, i) => {
+      const items = [];
+      for (const ev of events) {
+        if (!ev.rrule || !Engine.occursOn(ev, day)) continue;
+        items.push({ start: ev.startTime, end: ev.endTime, label: `🔒 ${ev.title}`, color: '#cbd5e1' });
+      }
+      for (const b of blocks) {
+        if (!b.start.startsWith(day)) continue;
+        const task = b.taskId ? store.getTask(b.taskId) : null;
+        const label = b.type === 'break' ? '☕ 休息' : (task ? task.title : '计划');
+        const color = b.type === 'break' ? '#86efac' : (task ? colorOf(task.category) : '#b0b7c3');
+        items.push({ start: b.start.slice(11), end: b.end.slice(11), label, color });
+      }
+      items.sort((a, b2) => a.start.localeCompare(b2.start));
+      const isToday = day === todayStr();
+      return `<div class="week-col ${isToday ? 'today' : ''}">
+        <div class="week-head">周${'一二三四五六日'[i === 6 ? 6 : i]}<small>${day.slice(5)}</small></div>
+        <div class="week-body">${items.map((it) => `
+          <div class="week-item" style="border-left-color:${it.color}" title="${esc(it.label)} ${it.start}-${it.end}">
+            <small>${it.start}</small> ${esc(it.label)}</div>`).join('') || '<p class="hint">空</p>'}</div>
+      </div>`;
+    }).join('');
+  }
+  function setViewMode(week) {
+    weekMode = week;
+    $('week-view').classList.toggle('hidden', !week);
+    $('timeline-wrap').classList.toggle('hidden', week);
+    $('view-toggle').textContent = week ? '切日视图' : '切周视图';
+    if (week) renderWeek();
+  }
+  $('view-toggle').onclick = () => setViewMode(!weekMode);
+
   // ---- 任务列表（含达标清单 + 文件夹 + 附件详情）----
   function renderTasks() {
     populateTargetSelects();
@@ -796,6 +843,35 @@
       if (!have('体育课')) await store.addFixedEvent({ title: '体育课', startTime: '14:00', endTime: '15:40', rrule: 'FREQ=WEEKLY;BYDAY=MO', effectiveFrom: '2026-11-02' });
       renderEvents();
       reschedule();
+    };
+    $('evt-ics').onclick = () => $('ics-file').click();
+    $('ics-file').onchange = async () => {
+      const file = $('ics-file').files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const { events, skipped } = Ics.parseIcs(text);
+        if (!events.length && !skipped) {
+          $('ics-result').textContent = '⚠️ 未识别到有效日程（确认是 .ics 文件）';
+          return;
+        }
+        // 去重：同名同时段的事件不重复导入
+        const existing = new Set(store.listFixedEvents().map((e) => `${e.title}|${e.startTime}|${e.endTime}|${e.rrule}`));
+        let added = 0;
+        for (const ev of events) {
+          const key = `${ev.title}|${ev.startTime}|${ev.endTime}|${ev.rrule}`;
+          if (existing.has(key)) continue;
+          existing.add(key);
+          await store.addFixedEvent(ev);
+          added += 1;
+        }
+        $('ics-result').textContent = `✓ 导入 ${added} 条固定安排` + (skipped ? `，跳过 ${skipped} 条（全天事件等）` : '');
+        renderEvents();
+        reschedule();
+      } catch (e) {
+        $('ics-result').textContent = '✗ 导入失败：' + e.message;
+      }
+      $('ics-file').value = '';
     };
     $('btn-reschedule').onclick = reschedule;
     $('btn-undo').onclick = async () => {

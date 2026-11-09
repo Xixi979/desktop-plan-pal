@@ -146,3 +146,15 @@ footer a { color: #6b7280; }
 #panel-nav .nav-btn:hover { background: #dbe2f5; }
 #panel-nav .nav-btn.active { background: #4f6ef7; color: #fff; }
 .nav-hint { font-size: 12px; color: #9ca3af; margin-left: 4px; }
+
+/* ---- v0.1.9：ICS 导入 + 周视图 ---- */
+.ics-result { font-size: 12px; color: #16a34a; margin-left: 6px; }
+button.mini { padding: 2px 10px; font-size: 12px; margin-left: 8px; vertical-align: middle; }
+#week-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 10px; }
+.week-col { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; min-height: 120px; }
+.week-col.today { border-color: #4f6ef7; background: #eef2ff; }
+.week-head { font-weight: 600; font-size: 13px; text-align: center; margin-bottom: 6px; }
+.week-head small { display: block; font-weight: 400; color: #94a3b8; }
+.week-item { font-size: 12px; padding: 3px 6px; margin-bottom: 4px; background: #fff;
+  border-left: 3px solid #b0b7c3; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-item small { color: #94a3b8; margin-right: 4px; }

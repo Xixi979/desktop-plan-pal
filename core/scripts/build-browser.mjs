@@ -37,9 +37,13 @@ const checklistJs = toBrowserJs('core/src/checklist.ts', 'Checklist', [
   'mergeChecklist',
 ]);
 
+const icsJs = toBrowserJs('core/src/ics.ts', 'Ics', [
+  'parseIcs',
+]);
+
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.1.8 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.1.9 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -166,6 +170,9 @@ if (!window.__PLAN_PAL_COMPAT__) {
       </select>
       <button id="evt-add">➕</button>
       <button id="evt-sample" title="载入睡眠+三节课的示例课表">载入示例课表</button>
+      <button id="evt-ics" title="导入 .ics 日历文件（导出自教务系统 / Outlook / Google 日历）">📥 导入ICS</button>
+      <input id="ics-file" type="file" accept=".ics,text/calendar" hidden>
+      <span id="ics-result" class="ics-result"></span>
     </div>
     <ul id="evt-list"></ul>
   </section>
@@ -187,9 +194,11 @@ if (!window.__PLAN_PAL_COMPAT__) {
     </div>
   </section>
   <section class="panel wide" id="panel-timeline">
-    <h2>🕐 今日时间轴 <span id="today-label"></span></h2>
+    <h2>🕐 今日时间轴 <span id="today-label"></span>
+      <button id="view-toggle" class="mini" title="切换日/周视图">切周视图</button></h2>
     <div id="warnings"></div>
     <div id="timeline-wrap"><div id="timeline"></div></div>
+    <div id="week-view" class="hidden"></div>
   </section>
 </main>
 <footer>桌面计划小人 · 本地优先 · 数据仅保存在本机浏览器 · <a href="https://github.com/" target="_blank">GitHub</a></footer>
@@ -201,6 +210,7 @@ ${storeJs}
 </script>
 <script>
 ${checklistJs}
+${icsJs}
 </script>
 <script>
 ${appJs}
