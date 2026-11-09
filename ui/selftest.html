@@ -259,7 +259,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
 </script>
 <div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.2.4 · 2026-11-09 11:52</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.2.5 · 2026-11-09 12:12</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -356,6 +356,8 @@ if (!window.__PLAN_PAL_COMPAT__) {
       <button id="evt-sample" title="载入睡眠+三节课的示例课表">载入示例课表</button>
       <button id="evt-ics" title="导入 .ics 日历文件（导出自教务系统 / Outlook / Google 日历）">📥 导入ICS</button>
       <input id="ics-file" type="file" accept=".ics,text/calendar" hidden>
+      <button id="evt-img" title="拍下或截图课表，自动识别每门课的时间和星期">📷 图片导入课表</button>
+      <input id="evt-img-file" type="file" accept="image/*" hidden>
       <span id="ics-result" class="ics-result"></span>
     </div>
     <ul id="evt-list"></ul>
@@ -1201,6 +1203,16 @@ class PlanStore {
     await this.commit('fixedEvent', id, 'delete', { before });
   }
 
+  /** 更新固定安排（v0.2.5：课表课程可自行修改标题/时间/星期） */
+  async updateFixedEvent(id        , patch                                 )                                  {
+    const before = this.fixedEvents.get(id);
+    if (!before) return undefined;
+    const after             = { ...before, ...patch, id };
+    if (after.endTime <= after.startTime) throw new Error('结束时间必须晚于开始时间');
+    await this.commit('fixedEvent', id, 'update', { before, after });
+    return after;
+  }
+
   // ---- 强度参数 / 执行记录 ----
 
   async setIntensity(profile                  )                {
@@ -1718,6 +1730,124 @@ async function parseDual(
 }
 
 window.Nlp = { parseRule, parseViaLLM, parseDual };
+
+/**
+ * 课表图片/文字解析（v0.2.5）
+ * 输入：OCR 识别出的文字行（每行一门课或一段课表信息）
+ * 输出：固定安排草稿（FixedEvent 去掉 id）
+ *
+ * 支持的行样式示例：
+ *  - 高等数学 周一 08:00-09:40
+ *  - 大学英语 星期三 第3-4节
+ *  - 体育 周二第5节
+ *  - 数据结构 周四 10:00-11:45 (1-16周)  ← 周次信息忽略，按每周重复
+ *  - 单周/双周标注同样忽略（按每周重复，可导入后手动调整）
+ */
+
+/** 节次 → 上课时间（24h，默认本科常见作息；每节 45 分钟） */
+const PERIOD_STARTS           = [
+  '08:00', '08:55', '10:00', '10:55', '14:00', '14:55', '16:00', '16:55', '19:00', '19:55',
+];
+
+const BYDAY_BY_DAY                         = {
+  一: 'MO', 二: 'TU', 三: 'WE', 四: 'TH', 五: 'FR', 六: 'SA', 日: 'SU', 天: 'SU',
+};
+
+                          
+                
+                    
+                  
+                
+ 
+
+function pad2(n        )         {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/** 节次区间 → 起止时间；返回 null 表示无法解析 */
+function periodsToTime(a        , b        )                                        {
+  if (a < 1 || b > PERIOD_STARTS.length || a > b) return null;
+  const start = PERIOD_STARTS[a - 1];
+  const endBase = PERIOD_STARTS[b - 1];
+  const [h, m] = endBase.split(':').map((x) => parseInt(x, 10));
+  const endMin = h * 60 + m + 45; // 每节 45 分钟
+  return { start, end: `${pad2(Math.floor(endMin / 60))}:${pad2(endMin % 60)}` };
+}
+
+/**
+ * 解析一行课表文字 → 草稿；无星期或无时间信息时返回 null
+ */
+function parseTimetableLine(line        )                 {
+  let t = line.replace(/\s+/g, ' ').trim();
+  if (t.length < 3) return null;
+
+  // 1) 星期（可多个：周一、周三）
+  const days           = [];
+  const dayRe = /(?:周|星期)([一二三四五六日天])/g;
+  let dm                        ;
+  while ((dm = dayRe.exec(t)) !== null) {
+    const code = BYDAY_BY_DAY[dm[1]];
+    if (code && !days.includes(code)) days.push(code);
+  }
+
+  // 2) 时间：优先 HH:MM-HH:MM，其次 第N-M节 / 第N节 / N-M节
+  let start = '';
+  let end = '';
+  const clockRe = /(\d{1,2})[:：点](\d{2})?\s*[-–—~至到]\s*(\d{1,2})[:：点](\d{2})?/;
+  const cm = clockRe.exec(t);
+  if (cm) {
+    start = `${pad2(+cm[1])}:${cm[2] ? cm[2] : '00'}`;
+    end = `${pad2(+cm[3])}:${cm[4] ? cm[4] : '00'}`;
+  } else {
+    const perRe = /第?\s*(\d{1,2})\s*(?:[-–—~至到]\s*第?\s*(\d{1,2}))?\s*节/;
+    const pm = perRe.exec(t);
+    if (pm) {
+      const a = parseInt(pm[1], 10);
+      const b = pm[2] ? parseInt(pm[2], 10) : a;
+      const span = periodsToTime(a, b);
+      if (span) { start = span.start; end = span.end; }
+    }
+  }
+  if (!days.length || !start || !end) return null;
+
+  // 3) 标题清洗：去掉星期/时间/节次/周次/单双周等结构词
+  const title = t
+    .replace(/(?:周|星期)[一二三四五六日天]/g, ' ')
+    .replace(/\d{1,2}[:：点]\d{2}?\s*[-–—~至到]\s*\d{1,2}[:：点]\d{2}?/g, ' ')
+    .replace(/第?\s*\d{1,2}\s*(?:[-–—~至到]\s*第?\s*\d{1,2})?\s*节/g, ' ')
+    .replace(/[（(][^）)]*[）)]/g, ' ') // (1-16周) 等括号注记
+    .replace(/单双周|单周|双周|每周|全周/g, ' ')
+    .replace(/[\d]{1,2}-[\d]{1,2}周/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s、,，。.\-—]+|[\s、,，。.\-—]+$/g, '')
+    .trim();
+  if (!title) return null;
+
+  return {
+    title,
+    startTime: start,
+    endTime: end,
+    rrule: `FREQ=WEEKLY;BYDAY=${days.join(',')}`,
+  };
+}
+
+/**
+ * 批量解析：多行 → 草稿数组（跳过无法解析的行，可带原始行便于提示）
+ */
+function parseTimetableLines(lines          )                                           {
+  const drafts            = [];
+  const skipped           = [];
+  for (const raw of lines) {
+    const line = (raw || '').trim();
+    if (!line) continue;
+    const d = parseTimetableLine(line);
+    if (d) drafts.push(d);
+    else if (line.length >= 3) skipped.push(line);
+  }
+  return { drafts, skipped };
+}
+
+window.Timetable = { parseTimetableLine, parseTimetableLines };
 
 </script>
 <script>
@@ -2501,14 +2631,24 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
     }
   }
 
+  /** BYDAY 代码 → 中文星期（如 MO,TU → 周一、周二） */
+  function bydayLabel(rrule) {
+    const m = (rrule || '').match(/BYDAY=([A-Z,]+)/);
+    if (!m) return '按周重复';
+    const names = { MO: '一', TU: '二', WE: '三', TH: '四', FR: '五', SA: '六', SU: '日' };
+    return m[1].split(',').map((d) => '周' + (names[d.trim()] || d)).join('、');
+  }
   function renderEvents() {
     const evs = store.listFixedEvents();
     $('evt-list').innerHTML = evs.map((e) => `
       <li><span class="dot" style="background:#94a3b8"></span>
         <b>${esc(e.title)}</b>
-        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? '按周重复' : '仅一次'}</span>
-        <span class="ops"><button data-act="delevt" data-id="${e.id}" title="删除">✕</button></span>
-      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
+        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? bydayLabel(e.rrule) : '仅一次'}</span>
+        <span class="ops">
+          <button data-act="editevt" data-id="${e.id}" title="修改这门课">✏️</button>
+          <button data-act="delevt" data-id="${e.id}" title="删除">✕</button>
+        </span>
+      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」，或用「📷 图片导入课表」</li>';
   }
 
   // ---- 小人（v0.2：Sprite 状态机，由计划数据驱动 Pet.setState） ----
@@ -2777,13 +2917,78 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
       const input = ev.target.closest('input[data-ck-input]');
       if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
     };
-    // 课表列表：删除按钮（✕）
+    // 课表列表：编辑（✏️）/ 删除（✕）/ 行内保存
     $('evt-list').onclick = async (ev) => {
       const btn = ev.target.closest('button');
-      if (!btn || btn.dataset.act !== 'delevt') return;
-      await store.removeFixedEvent(btn.dataset.id);
-      renderEvents();
-      reschedule();
+      if (!btn) return;
+      if (btn.dataset.act === 'delevt') {
+        await store.removeFixedEvent(btn.dataset.id);
+        renderEvents();
+        reschedule();
+        return;
+      }
+      if (btn.dataset.act === 'editevt') {
+        const e = store.listFixedEvents().find((x) => x.id === btn.dataset.id);
+        if (!e) return;
+        const li = btn.closest('li');
+        const byday = (e.rrule.match(/BYDAY=([A-Z,]+)/) || [])[1] || '';
+        const BY2NUM = { MO: '1', TU: '2', WE: '3', TH: '4', FR: '5', SA: '6', SU: '7' };
+        const dayVal = e.rrule.includes('DAILY') ? 'daily'
+          : byday && BY2NUM[byday.split(',')[0]] ? BY2NUM[byday.split(',')[0]] : 'once';
+        li.innerHTML = `
+          <span class="dot" style="background:#94a3b8"></span>
+          <input class="ee-title" value="${esc(e.title)}" style="flex:1;min-width:90px">
+          <input type="time" class="ee-start" value="${e.startTime}" style="max-width:96px">
+          <input type="time" class="ee-end" value="${e.endTime}" style="max-width:96px">
+          <select class="ee-day" style="max-width:88px">
+            <option value="daily">每天</option>
+            <option value="1">周一</option><option value="2">周二</option>
+            <option value="3">周三</option><option value="4">周四</option>
+            <option value="5">周五</option><option value="6">周六</option>
+            <option value="7">周日</option>
+            <option value="once">仅一次</option>
+          </select>
+          <button data-act="ee-save" data-id="${e.id}" title="保存修改">✓</button>
+          <button data-act="ee-cancel" title="取消修改">✗</button>`;
+        li.querySelector('.ee-day').value = dayVal;
+        li.querySelector('.ee-title').focus();
+        return;
+      }
+      if (btn.dataset.act === 'ee-cancel') {
+        renderEvents();
+        return;
+      }
+      if (btn.dataset.act === 'ee-save') {
+        const li = btn.closest('li');
+        const title = li.querySelector('.ee-title').value.trim();
+        if (!title) { showToast('名称不能为空'); li.querySelector('.ee-title').focus(); return; }
+        const startTime = li.querySelector('.ee-start').value || '08:00';
+        const endTime = li.querySelector('.ee-end').value || '09:40';
+        if (endTime <= startTime) { showToast('结束时间必须晚于开始时间'); return; }
+        const dayVal = li.querySelector('.ee-day').value;
+        const NUM2BY = { 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA', 7: 'SU' };
+        const rrule = dayVal === 'daily' ? 'FREQ=DAILY'
+          : dayVal === 'once' ? '' : `FREQ=WEEKLY;BYDAY=${NUM2BY[dayVal]}`;
+        try {
+          await store.updateFixedEvent(btn.dataset.id, { title, startTime, endTime, rrule });
+          showToast('✓ 已修改课程安排');
+        } catch (e) {
+          showToast('修改失败：' + e.message);
+          return;
+        }
+        renderEvents();
+        reschedule();
+        return;
+      }
+    };
+    // 编辑行内按回车直接保存
+    $('evt-list').onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      const input = ev.target.closest('.ee-title, .ee-start, .ee-end');
+      if (!input) return;
+      const li = input.closest('li');
+      const save = li.querySelector('button[data-act="ee-save"]');
+      if (save) save.click();
     };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
@@ -2813,6 +3018,11 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
     $('ics-file').onchange = async () => {
       const file = $('ics-file').files[0];
       if (!file) return;
+      if (!window.Ics) {
+        $('ics-result').textContent = '⚠️ 页面版本过旧（缺少ICS模块）——请关闭本窗口，重新双击小人打开新版';
+        $('ics-file').value = '';
+        return;
+      }
       try {
         const text = await file.text();
         const { events, skipped } = Ics.parseIcs(text);
@@ -2837,6 +3047,58 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
         $('ics-result').textContent = '✗ 导入失败：' + e.message;
       }
       $('ics-file').value = '';
+    };
+    // 课表图片导入：OCR 识别文字行 → Timetable 解析 → 去重入库
+    $('evt-img').onclick = () => $('evt-img-file').click();
+    $('evt-img-file').onchange = async () => {
+      const file = $('evt-img-file').files[0];
+      if (!file) return;
+      if (!window.Timetable) {
+        $('ics-result').textContent = '⚠️ 页面版本过旧（缺少课表模块）——请关闭本窗口，重新双击小人打开新版';
+        $('evt-img-file').value = '';
+        return;
+      }
+      $('ics-result').textContent = '🔍 正在识别课表图片（首次需下载中文模型，请稍候）…';
+      try {
+        const T = await ensureTesseract();
+        if (!T) {
+          $('ics-result').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时）——可改用「📥 导入ICS」或手动添加';
+          return;
+        }
+        const dataUrl = await compressImage(file, 1400, 0.8);
+        const r = await T.recognize(dataUrl, 'chi_sim+eng');
+        const lines = (r.data.text || '').split(/\n+/)
+          .map((s) => s.replace(/\s+/g, ' ').trim())
+          .filter((s) => s.length >= 3);
+        if (!lines.length) {
+          $('ics-result').textContent = '⚠️ 图片中未识别出文字（照片要清晰、课表文字方向要正）';
+          return;
+        }
+        const { drafts, skipped } = window.Timetable.parseTimetableLines(lines);
+        if (!drafts.length) {
+          $('ics-result').textContent = '⚠️ 识别到 ' + lines.length + ' 行文字，但没有「课名 + 周X + 时间/节次」格式的课程行——可手动添加，每行示例：高等数学 周一 08:00-09:40';
+          return;
+        }
+        // 去重：同名同时段不重复导入
+        const existing = new Set(store.listFixedEvents().map((e) => `${e.title}|${e.startTime}|${e.endTime}|${e.rrule}`));
+        let added = 0;
+        for (const d of drafts) {
+          const key = `${d.title}|${d.startTime}|${d.endTime}|${d.rrule}`;
+          if (existing.has(key)) continue;
+          existing.add(key);
+          await store.addFixedEvent(d);
+          added += 1;
+        }
+        $('ics-result').textContent = `✓ 已从课表图片导入 ${added} 门课`
+          + (added < drafts.length ? `（${drafts.length - added} 门已存在跳过）` : '')
+          + (skipped.length ? `，${skipped.length} 行无法识别已跳过` : '')
+          + '。每门课悬停后点 ✏️ 可修改';
+        renderEvents();
+        reschedule();
+      } catch (e) {
+        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || '未知错误');
+      }
+      $('evt-img-file').value = '';
     };
     $('btn-reschedule').onclick = reschedule;
     $('btn-undo').onclick = async () => {
@@ -3077,6 +3339,28 @@ window.Nlp = { parseRule, parseViaLLM, parseDual };
     const tid = btn.dataset.tid;
     const hit = window.__pal.store.getTask(tid).checklist.some((c) => c.text === '自测修改后的达标要求');
     if (!hit) throw new Error('修改未保存');
+  });
+  // v0.2.5 课表编辑
+  await tryStep('课表条目进入编辑模式', async () => {
+    const li = document.querySelector('#evt-list li');
+    if (!li) throw new Error('无课表条目');
+    li.querySelector('button[data-act="editevt"]').click();
+    await sleep(200);
+    if (!document.querySelector('#evt-list .ee-title')) throw new Error('编辑行未出现');
+    if (!document.querySelector('#evt-list .ee-day')) throw new Error('星期下拉未出现');
+  });
+  await tryStep('课表编辑保存生效', async () => {
+    const li = document.querySelector('#evt-list li');
+    const id = li.querySelector('button[data-act="ee-save"]').dataset.id;
+    li.querySelector('.ee-title').value = '自测课程B';
+    li.querySelector('.ee-start').value = '10:00';
+    li.querySelector('.ee-end').value = '11:40';
+    li.querySelector('.ee-day').value = '3';
+    li.querySelector('button[data-act="ee-save"]').click();
+    await sleep(400);
+    const e = window.__pal.store.listFixedEvents().find((x) => x.id === id);
+    if (!e || e.title !== '自测课程B' || e.startTime !== '10:00') throw new Error('修改未保存: ' + JSON.stringify(e));
+    if (e.rrule.indexOf('WE') === -1) throw new Error('星期未生效: ' + e.rrule);
   });
   out.push('DONE');
   paint();

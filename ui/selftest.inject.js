@@ -119,6 +119,28 @@
     const hit = window.__pal.store.getTask(tid).checklist.some((c) => c.text === '自测修改后的达标要求');
     if (!hit) throw new Error('修改未保存');
   });
+  // v0.2.5 课表编辑
+  await tryStep('课表条目进入编辑模式', async () => {
+    const li = document.querySelector('#evt-list li');
+    if (!li) throw new Error('无课表条目');
+    li.querySelector('button[data-act="editevt"]').click();
+    await sleep(200);
+    if (!document.querySelector('#evt-list .ee-title')) throw new Error('编辑行未出现');
+    if (!document.querySelector('#evt-list .ee-day')) throw new Error('星期下拉未出现');
+  });
+  await tryStep('课表编辑保存生效', async () => {
+    const li = document.querySelector('#evt-list li');
+    const id = li.querySelector('button[data-act="ee-save"]').dataset.id;
+    li.querySelector('.ee-title').value = '自测课程B';
+    li.querySelector('.ee-start').value = '10:00';
+    li.querySelector('.ee-end').value = '11:40';
+    li.querySelector('.ee-day').value = '3';
+    li.querySelector('button[data-act="ee-save"]').click();
+    await sleep(400);
+    const e = window.__pal.store.listFixedEvents().find((x) => x.id === id);
+    if (!e || e.title !== '自测课程B' || e.startTime !== '10:00') throw new Error('修改未保存: ' + JSON.stringify(e));
+    if (e.rrule.indexOf('WE') === -1) throw new Error('星期未生效: ' + e.rrule);
+  });
   out.push('DONE');
   paint();
 })();

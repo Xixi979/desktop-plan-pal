@@ -680,14 +680,24 @@
     }
   }
 
+  /** BYDAY 代码 → 中文星期（如 MO,TU → 周一、周二） */
+  function bydayLabel(rrule) {
+    const m = (rrule || '').match(/BYDAY=([A-Z,]+)/);
+    if (!m) return '按周重复';
+    const names = { MO: '一', TU: '二', WE: '三', TH: '四', FR: '五', SA: '六', SU: '日' };
+    return m[1].split(',').map((d) => '周' + (names[d.trim()] || d)).join('、');
+  }
   function renderEvents() {
     const evs = store.listFixedEvents();
     $('evt-list').innerHTML = evs.map((e) => `
       <li><span class="dot" style="background:#94a3b8"></span>
         <b>${esc(e.title)}</b>
-        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? '按周重复' : '仅一次'}</span>
-        <span class="ops"><button data-act="delevt" data-id="${e.id}" title="删除">✕</button></span>
-      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」</li>';
+        <span class="meta">${e.startTime}-${e.endTime} · ${e.rrule.includes('DAILY') ? '每天' : e.rrule ? bydayLabel(e.rrule) : '仅一次'}</span>
+        <span class="ops">
+          <button data-act="editevt" data-id="${e.id}" title="修改这门课">✏️</button>
+          <button data-act="delevt" data-id="${e.id}" title="删除">✕</button>
+        </span>
+      </li>`).join('') || '<li class="empty">还没有固定安排，可点击「载入示例课表」，或用「📷 图片导入课表」</li>';
   }
 
   // ---- 小人（v0.2：Sprite 状态机，由计划数据驱动 Pet.setState） ----
@@ -956,13 +966,78 @@
       const input = ev.target.closest('input[data-ck-input]');
       if (input && ev.key === 'Enter') addCheckItem(input.dataset.ckInput, input.value);
     };
-    // 课表列表：删除按钮（✕）
+    // 课表列表：编辑（✏️）/ 删除（✕）/ 行内保存
     $('evt-list').onclick = async (ev) => {
       const btn = ev.target.closest('button');
-      if (!btn || btn.dataset.act !== 'delevt') return;
-      await store.removeFixedEvent(btn.dataset.id);
-      renderEvents();
-      reschedule();
+      if (!btn) return;
+      if (btn.dataset.act === 'delevt') {
+        await store.removeFixedEvent(btn.dataset.id);
+        renderEvents();
+        reschedule();
+        return;
+      }
+      if (btn.dataset.act === 'editevt') {
+        const e = store.listFixedEvents().find((x) => x.id === btn.dataset.id);
+        if (!e) return;
+        const li = btn.closest('li');
+        const byday = (e.rrule.match(/BYDAY=([A-Z,]+)/) || [])[1] || '';
+        const BY2NUM = { MO: '1', TU: '2', WE: '3', TH: '4', FR: '5', SA: '6', SU: '7' };
+        const dayVal = e.rrule.includes('DAILY') ? 'daily'
+          : byday && BY2NUM[byday.split(',')[0]] ? BY2NUM[byday.split(',')[0]] : 'once';
+        li.innerHTML = `
+          <span class="dot" style="background:#94a3b8"></span>
+          <input class="ee-title" value="${esc(e.title)}" style="flex:1;min-width:90px">
+          <input type="time" class="ee-start" value="${e.startTime}" style="max-width:96px">
+          <input type="time" class="ee-end" value="${e.endTime}" style="max-width:96px">
+          <select class="ee-day" style="max-width:88px">
+            <option value="daily">每天</option>
+            <option value="1">周一</option><option value="2">周二</option>
+            <option value="3">周三</option><option value="4">周四</option>
+            <option value="5">周五</option><option value="6">周六</option>
+            <option value="7">周日</option>
+            <option value="once">仅一次</option>
+          </select>
+          <button data-act="ee-save" data-id="${e.id}" title="保存修改">✓</button>
+          <button data-act="ee-cancel" title="取消修改">✗</button>`;
+        li.querySelector('.ee-day').value = dayVal;
+        li.querySelector('.ee-title').focus();
+        return;
+      }
+      if (btn.dataset.act === 'ee-cancel') {
+        renderEvents();
+        return;
+      }
+      if (btn.dataset.act === 'ee-save') {
+        const li = btn.closest('li');
+        const title = li.querySelector('.ee-title').value.trim();
+        if (!title) { showToast('名称不能为空'); li.querySelector('.ee-title').focus(); return; }
+        const startTime = li.querySelector('.ee-start').value || '08:00';
+        const endTime = li.querySelector('.ee-end').value || '09:40';
+        if (endTime <= startTime) { showToast('结束时间必须晚于开始时间'); return; }
+        const dayVal = li.querySelector('.ee-day').value;
+        const NUM2BY = { 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA', 7: 'SU' };
+        const rrule = dayVal === 'daily' ? 'FREQ=DAILY'
+          : dayVal === 'once' ? '' : `FREQ=WEEKLY;BYDAY=${NUM2BY[dayVal]}`;
+        try {
+          await store.updateFixedEvent(btn.dataset.id, { title, startTime, endTime, rrule });
+          showToast('✓ 已修改课程安排');
+        } catch (e) {
+          showToast('修改失败：' + e.message);
+          return;
+        }
+        renderEvents();
+        reschedule();
+        return;
+      }
+    };
+    // 编辑行内按回车直接保存
+    $('evt-list').onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      const input = ev.target.closest('.ee-title, .ee-start, .ee-end');
+      if (!input) return;
+      const li = input.closest('li');
+      const save = li.querySelector('button[data-act="ee-save"]');
+      if (save) save.click();
     };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
@@ -992,6 +1067,11 @@
     $('ics-file').onchange = async () => {
       const file = $('ics-file').files[0];
       if (!file) return;
+      if (!window.Ics) {
+        $('ics-result').textContent = '⚠️ 页面版本过旧（缺少ICS模块）——请关闭本窗口，重新双击小人打开新版';
+        $('ics-file').value = '';
+        return;
+      }
       try {
         const text = await file.text();
         const { events, skipped } = Ics.parseIcs(text);
@@ -1016,6 +1096,58 @@
         $('ics-result').textContent = '✗ 导入失败：' + e.message;
       }
       $('ics-file').value = '';
+    };
+    // 课表图片导入：OCR 识别文字行 → Timetable 解析 → 去重入库
+    $('evt-img').onclick = () => $('evt-img-file').click();
+    $('evt-img-file').onchange = async () => {
+      const file = $('evt-img-file').files[0];
+      if (!file) return;
+      if (!window.Timetable) {
+        $('ics-result').textContent = '⚠️ 页面版本过旧（缺少课表模块）——请关闭本窗口，重新双击小人打开新版';
+        $('evt-img-file').value = '';
+        return;
+      }
+      $('ics-result').textContent = '🔍 正在识别课表图片（首次需下载中文模型，请稍候）…';
+      try {
+        const T = await ensureTesseract();
+        if (!T) {
+          $('ics-result').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时）——可改用「📥 导入ICS」或手动添加';
+          return;
+        }
+        const dataUrl = await compressImage(file, 1400, 0.8);
+        const r = await T.recognize(dataUrl, 'chi_sim+eng');
+        const lines = (r.data.text || '').split(/\n+/)
+          .map((s) => s.replace(/\s+/g, ' ').trim())
+          .filter((s) => s.length >= 3);
+        if (!lines.length) {
+          $('ics-result').textContent = '⚠️ 图片中未识别出文字（照片要清晰、课表文字方向要正）';
+          return;
+        }
+        const { drafts, skipped } = window.Timetable.parseTimetableLines(lines);
+        if (!drafts.length) {
+          $('ics-result').textContent = '⚠️ 识别到 ' + lines.length + ' 行文字，但没有「课名 + 周X + 时间/节次」格式的课程行——可手动添加，每行示例：高等数学 周一 08:00-09:40';
+          return;
+        }
+        // 去重：同名同时段不重复导入
+        const existing = new Set(store.listFixedEvents().map((e) => `${e.title}|${e.startTime}|${e.endTime}|${e.rrule}`));
+        let added = 0;
+        for (const d of drafts) {
+          const key = `${d.title}|${d.startTime}|${d.endTime}|${d.rrule}`;
+          if (existing.has(key)) continue;
+          existing.add(key);
+          await store.addFixedEvent(d);
+          added += 1;
+        }
+        $('ics-result').textContent = `✓ 已从课表图片导入 ${added} 门课`
+          + (added < drafts.length ? `（${drafts.length - added} 门已存在跳过）` : '')
+          + (skipped.length ? `，${skipped.length} 行无法识别已跳过` : '')
+          + '。每门课悬停后点 ✏️ 可修改';
+        renderEvents();
+        reschedule();
+      } catch (e) {
+        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || '未知错误');
+      }
+      $('evt-img-file').value = '';
     };
     $('btn-reschedule').onclick = reschedule;
     $('btn-undo').onclick = async () => {

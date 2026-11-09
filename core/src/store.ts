@@ -285,6 +285,16 @@ export class PlanStore {
     await this.commit('fixedEvent', id, 'delete', { before });
   }
 
+  /** 更新固定安排（v0.2.5：课表课程可自行修改标题/时间/星期） */
+  async updateFixedEvent(id: string, patch: Partial<Omit<FixedEvent, 'id'>>): Promise<FixedEvent | undefined> {
+    const before = this.fixedEvents.get(id);
+    if (!before) return undefined;
+    const after: FixedEvent = { ...before, ...patch, id };
+    if (after.endTime <= after.startTime) throw new Error('结束时间必须晚于开始时间');
+    await this.commit('fixedEvent', id, 'update', { before, after });
+    return after;
+  }
+
   // ---- 强度参数 / 执行记录 ----
 
   async setIntensity(profile: IntensityProfile): Promise<void> {

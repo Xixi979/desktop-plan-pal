@@ -45,10 +45,14 @@ const nlpJs = toBrowserJs('core/src/nlp.ts', 'Nlp', [
   'parseRule', 'parseViaLLM', 'parseDual',
 ]);
 
+const timetableJs = toBrowserJs('core/src/timetable.ts', 'Timetable', [
+  'parseTimetableLine', 'parseTimetableLines',
+]);
+
 const appJs = read('ui/src/app.js');
 const petJs = read('ui/src/pet.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.2.4 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.2.5 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -179,6 +183,8 @@ if (!window.__PLAN_PAL_COMPAT__) {
       <button id="evt-sample" title="载入睡眠+三节课的示例课表">载入示例课表</button>
       <button id="evt-ics" title="导入 .ics 日历文件（导出自教务系统 / Outlook / Google 日历）">📥 导入ICS</button>
       <input id="ics-file" type="file" accept=".ics,text/calendar" hidden>
+      <button id="evt-img" title="拍下或截图课表，自动识别每门课的时间和星期">📷 图片导入课表</button>
+      <input id="evt-img-file" type="file" accept="image/*" hidden>
       <span id="ics-result" class="ics-result"></span>
     </div>
     <ul id="evt-list"></ul>
@@ -235,6 +241,7 @@ ${icsJs}
 </script>
 <script>
 ${nlpJs}
+${timetableJs}
 </script>
 <script>
 ${petJs}
