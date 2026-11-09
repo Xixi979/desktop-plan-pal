@@ -57,11 +57,11 @@ export function occursOn(ev: FixedEvent, date: string): boolean {
   if (!ev.rrule) return date === ev.effectiveFrom;
   if (date < ev.effectiveFrom) return false;
   if (ev.effectiveUntil && date > ev.effectiveUntil) return false;
-  if (ev.exceptions?.includes(date)) return false;
-  const freq = /FREQ=(DAILY|WEEKLY)/.exec(ev.rrule)?.[1];
+  if (ev.exceptions && ev.exceptions.includes(date)) return false;
+  const freq = (/FREQ=(DAILY|WEEKLY)/.exec(ev.rrule) || [])[1];
   if (freq === 'DAILY') return true;
   if (freq === 'WEEKLY') {
-    const byday = /BYDAY=([A-Z,]+)/.exec(ev.rrule)?.[1];
+    const byday = (/BYDAY=([A-Z,]+)/.exec(ev.rrule) || [])[1];
     if (!byday) return weekdayOf(date) === weekdayOf(ev.effectiveFrom);
     return byday.split(',').some((k) => BYDAY_MAP[k] === weekdayOf(date));
   }
@@ -293,7 +293,7 @@ export function greedySchedule(
 
   const sorted = [...tasks].sort((a, b) =>
     b.priority - a.priority ||
-    (a.deadline ?? '9999').localeCompare(b.deadline ?? '9999') ||
+    (a.deadline || '9999').localeCompare(b.deadline || '9999') ||
     b.estimatedMinutes - a.estimatedMinutes);
 
   // 预检：不可拆分且超出单块上限 → 直接无法排布
@@ -314,7 +314,7 @@ export function greedySchedule(
   while (progress) {
     progress = false;
     for (const task of sorted) {
-      const remaining = remainingMap.get(task.id) ?? 0;
+      const remaining = remainingMap.get(task.id) || 0;
       if (remaining <= 0) continue;
       const deadlineMin = task.deadline ? toMin(task.deadline) : Number.POSITIVE_INFINITY;
 
@@ -322,7 +322,7 @@ export function greedySchedule(
       const candidates = slots
         .map((s, idx) => {
           const base = scorePlacement(task, { start: toIso(s.start), end: toIso(s.end) }, profile).score;
-          const diversityPenalty = 0.1 * (sameCatCount.get(`${s.date}|${task.category}`) ?? 0);
+          const diversityPenalty = 0.1 * (sameCatCount.get(`${s.date}|${task.category}`) || 0);
           return { idx, s, score: base - diversityPenalty };
         })
         .filter(({ s }) => s.end - s.start >= Math.max(profile.blockMinMinutes,
@@ -345,7 +345,7 @@ export function greedySchedule(
           // 类别配额
           const catKey = `${date}|${task.category}`;
           const quota = profile.categoryQuotas[task.category];
-          if (quota != null && (categoryLoad.get(catKey) ?? 0) + chunk > quota) continue candidateLoop;
+          if (quota != null && (categoryLoad.get(catKey) || 0) + chunk > quota) continue candidateLoop;
 
           const start = s.start;
           // 连续工作上限：必要时压缩块长
@@ -372,9 +372,9 @@ export function greedySchedule(
 
           // 提交放置
           blocks.push(candidate);
-          dailyLoad.set(date, (dailyLoad.get(date) ?? 0) + chunk);
-          categoryLoad.set(catKey, (categoryLoad.get(catKey) ?? 0) + chunk);
-          sameCatCount.set(catKey, (sameCatCount.get(catKey) ?? 0) + 1);
+          dailyLoad.set(date, (dailyLoad.get(date) || 0) + chunk);
+          categoryLoad.set(catKey, (categoryLoad.get(catKey) || 0) + chunk);
+          sameCatCount.set(catKey, (sameCatCount.get(catKey) || 0) + 1);
           // 收缩槽位并预留最小休息间隔
           s.start = end + profile.minBreakMinutes;
           if (s.start + profile.blockMinMinutes > s.end) removeSlot(idx);
@@ -389,7 +389,7 @@ export function greedySchedule(
 
   // 收尾：仍有剩余时长未排布的任务进入 unplaced，DDL 任务产出容量预警
   for (const task of sorted) {
-    const remaining = remainingMap.get(task.id) ?? 0;
+    const remaining = remainingMap.get(task.id) || 0;
     if (remaining > 0) {
       unplaced.push(task);
       if (task.deadline) pushCapacityWarning(task, remaining);

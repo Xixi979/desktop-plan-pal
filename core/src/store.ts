@@ -139,8 +139,8 @@ export class PlanStore {
       this.seq = snap.seq;
       this.tasks = new Map(snap.tasks.map((t) => [t.id, t]));
       this.fixedEvents = new Map(snap.fixedEvents.map((e) => [e.id, e]));
-      this.executionLogs = snap.executionLogs ?? [];
-      this.intensity = snap.intensity ?? null;
+      this.executionLogs = snap.executionLogs || [];
+      this.intensity = snap.intensity || null;
     }
     const entries = await this.adapter.readEntries();
     for (const entry of entries) {

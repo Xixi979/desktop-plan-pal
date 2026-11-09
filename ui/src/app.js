@@ -17,7 +17,7 @@
   }
   /** HTML 转义：所有用户输入内容插入 DOM 前必须经过这里 */
   function esc(s) {
-    return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
   }
@@ -212,7 +212,7 @@
     const images = extras.images || [];
     const created = await store.addTask({
       title: base.title, category: base.category || '学习',
-      estimatedMinutes: base.minutes, priority: base.priority ?? 3,
+      estimatedMinutes: base.minutes, priority: base.priority == null ? 3 : base.priority,
       splittable: base.minutes >= 50, minBlockMinutes: Math.min(25, base.minutes),
       deadline: base.deadline || null,
       source: extras.source, folderPath: null,
@@ -436,7 +436,7 @@
     const list = (t.checklist || []).map((c) => c.id === ckid
       ? { ...c, done: checked, doneAt: checked ? new Date().toISOString() : undefined } : c);
     await store.updateTask(tid, { checklist: list }); // 达标自动完成/回退规则在数据层统一生效
-    const nowDone = store.getTask(tid)?.status === 'done';
+    const nowDone = (store.getTask(tid) || {}).status === 'done';
     renderTasks();
     if (wasDone !== nowDone) reschedule(); // 完成状态变化后腾出/释放时间，重排剩余计划
   }
@@ -701,7 +701,7 @@
     // Ctrl+V 直接粘贴截图（可多张）
     document.addEventListener('paste', (e) => {
       if (!$('pane-image') || $('pane-image').classList.contains('hidden')) return;
-      const files = [...(e.clipboardData?.items || [])]
+      const files = [...((e.clipboardData && e.clipboardData.items) || [])]
         .filter((i) => i.type.startsWith('image/'))
         .map((i) => i.getAsFile()).filter(Boolean);
       if (files.length) acceptImageFiles(files);

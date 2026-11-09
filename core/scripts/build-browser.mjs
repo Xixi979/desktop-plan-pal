@@ -39,7 +39,7 @@ const checklistJs = toBrowserJs('core/src/checklist.ts', 'Checklist', [
 
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.1.7 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.1.8 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -51,8 +51,26 @@ const html = `<!DOCTYPE html>
 <style>
 ${css}
 </style>
+<script>
+// ES5 兼容性预检：老内核浏览器无法解析新版 JS 时给出明确提示（本段必须用 ES5 写法）
+window.__PLAN_PAL_COMPAT__ = (function () {
+  try { new Function('var a = {b:1}; return a?.b ?? 0;'); return true; }
+  catch (e) { return false; }
+})();
+</script>
 </head>
 <body>
+<script>
+// 兼容性横幅（ES5，早于应用脚本执行）
+if (!window.__PLAN_PAL_COMPAT__) {
+  document.write('<div style="position:fixed;inset:0;z-index:999999;background:#fff;color:#b91c1c;'
+    + 'font:16px/1.8 sans-serif;padding:40px;text-align:center">'
+    + '<h2 style="color:#b91c1c">⚠️ 浏览器内核过旧</h2>'
+    + '<p>桌面计划小人需要较新的浏览器内核（Chrome 80+ / Edge 80+ / Firefox 80+）。<br>'
+    + '当前浏览器无法运行本应用，请使用系统自带 Microsoft Edge 打开本文件，<br>'
+    + '或安装最新版 Edge / Chrome。</p></div>');
+}
+</script>
 <div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
 <header>
   <h1>桌面计划小人 <span class="ver">${BUILD_TAG}</span></h1>
