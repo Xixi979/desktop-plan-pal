@@ -135,3 +135,14 @@ footer a { color: #6b7280; }
   background: #f5f8ff; border: 1px solid #dbe4ff; border-radius: 6px; padding: 5px 8px;
 }
 .link-chip .chip-x { position: static; flex-shrink: 0; }
+
+/* ---- 板块折叠导航 ---- */
+#panel-nav {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+#panel-nav .nav-btn {
+  background: #eef1f8; color: #4b5563; border-radius: 16px; padding: 6px 16px; font-size: 13px;
+}
+#panel-nav .nav-btn:hover { background: #dbe2f5; }
+#panel-nav .nav-btn.active { background: #4f6ef7; color: #fff; }
+.nav-hint { font-size: 12px; color: #9ca3af; margin-left: 4px; }

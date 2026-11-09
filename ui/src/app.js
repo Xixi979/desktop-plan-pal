@@ -245,8 +245,55 @@
     }
   }
 
-  // ---- 图片录入（多张；本地规则版：压缩预览 + 文件名/备注识别；OCR 在 v0.2 接入）----
-  function compressImage(file, maxW = 480) {
+  // ---- 图片 OCR 文字识别（Tesseract.js 中文，按需从 CDN 加载；失败自动降级）----
+  let ocrScriptLoading = false;
+  function ensureTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (ocrScriptLoading) return Promise.resolve(null);
+    ocrScriptLoading = true;
+    return new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      const done = (t) => { ocrScriptLoading = false; resolve(t); };
+      s.onload = () => done(window.Tesseract || null);
+      s.onerror = () => done(null);
+      document.head.appendChild(s);
+      setTimeout(() => done(window.Tesseract || null), 20000);
+    });
+  }
+  async function ocrPendingImages() {
+    if (!pendingImages.length) return;
+    const T = await ensureTesseract();
+    if (!T) {
+      $('img-feedback').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时），已按文件名生成达标要求';
+      return;
+    }
+    try {
+      const linesAll = [];
+      for (let i = 0; i < pendingImages.length; i++) {
+        $('img-feedback').textContent = `🔍 正在识别第 ${i + 1}/${pendingImages.length} 张图片的文字（首次需下载中文模型，请稍候）…`;
+        const r = await T.recognize(pendingImages[i].ocrUrl || pendingImages[i].dataUrl, 'chi_sim+eng');
+        const lines = (r.data.text || '').split(/\n+/)
+          .map((s) => s.replace(/\s+/g, ' ').trim())
+          .filter((s) => s.length >= 2 && !/^[\s\d\p{P}]*$/u.test(s));
+        linesAll.push(...lines);
+      }
+      if (linesAll.length) {
+        // 识别行并入备注（保留用户已填内容，去重）
+        const userLines = splitSteps($('img-note').value);
+        const merged = [...new Set([...userLines, ...linesAll])].join('、');
+        $('img-note').value = merged;
+        $('img-feedback').textContent = `✓ 已从图片识别出 ${linesAll.length} 行文字并并入达标要求来源（备注栏可编辑）`;
+      } else {
+        $('img-feedback').textContent = '⚠️ 图片中未识别出有效文字，已按文件名生成达标要求';
+      }
+    } catch (e) {
+      $('img-feedback').textContent = '⚠️ 文字识别失败（' + (e.message || '未知错误') + '），已按文件名生成达标要求';
+    }
+  }
+
+  // ---- 图片录入（多张；本地规则版：压缩预览 + 文件名/备注/OCR 识别）----
+  function compressImage(file, maxW = 480, quality = 0.6) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -256,14 +303,25 @@
         c.width = Math.round(img.width * scale);
         c.height = Math.round(img.height * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const dataUrl = c.toDataURL('image/jpeg', quality);
+        // OCR 用更高分辨率版本（不持久化，仅内存）
+        let ocrUrl = dataUrl;
+        if (img.width > maxW) {
+          const s2 = Math.min(1, 1200 / img.width);
+          const c2 = document.createElement('canvas');
+          c2.width = Math.round(img.width * s2);
+          c2.height = Math.round(img.height * s2);
+          c2.getContext('2d').drawImage(img, 0, 0, c2.width, c2.height);
+          ocrUrl = c2.toDataURL('image/jpeg', 0.85);
+        }
         URL.revokeObjectURL(url);
-        resolve({ name: file.name.replace(/\.[a-z0-9]+$/i, '') || '图片', dataUrl: c.toDataURL('image/jpeg', 0.6) });
+        resolve({ name: file.name.replace(/\.[a-z0-9]+$/i, '') || '图片', dataUrl, ocrUrl });
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
       img.src = url;
     });
   }
-  let pendingImages = []; // { name, dataUrl }
+  let pendingImages = []; // { name, dataUrl, ocrUrl }
   function renderImgThumbs() {
     $('img-thumbs').innerHTML = pendingImages.map((im, i) => `
       <span class="img-chip"><img src="${im.dataUrl}" alt="${esc(im.name)}">
@@ -275,10 +333,13 @@
   }
   async function acceptImageFiles(fileList) {
     const files = [...fileList].filter((f) => f.type.startsWith('image/')).slice(0, 12);
+    if (!files.length) return;
     for (const f of files) {
       try { pendingImages.push(await compressImage(f)); } catch (e) { alert(e.message); }
     }
     renderImgThumbs();
+    $('img-feedback').textContent = '🔍 准备识别图片文字…';
+    ocrPendingImages(); // 自动解析图片内容 → 并入备注 → 提交时生成达标要求
   }
   async function addImageTask() {
     if (!pendingImages.length) return;
@@ -569,8 +630,25 @@
     };
   }
 
+  // ---- 板块折叠导航：除计划列表外默认隐藏，单按钮展开/收起 ----
+  const COLLAPSIBLE = ['panel-quick', 'panel-events', 'panel-params', 'panel-timeline'];
+  function bindNav() {
+    $('panel-nav').onclick = (ev) => {
+      const b = ev.target.closest('.nav-btn');
+      if (!b) return;
+      const p = $(b.dataset.panel);
+      const show = p.classList.contains('hidden');
+      p.classList.toggle('hidden', !show);
+      b.classList.toggle('active', show);
+    };
+  }
+  function collapseAllPanels() {
+    for (const id of COLLAPSIBLE) $(id).classList.add('hidden');
+  }
+
   function bind() {
     bindTabs();
+    bindNav();
     // 通道一：一句话（同名计划自动并入并完善达标要求）
     $('quick-add').onclick = async () => {
       const raw = $('quick-input').value;
@@ -587,6 +665,26 @@
         await store.addTask({ ...parsed, source: 'text', folderPath: null, checklist });
       }
       $('quick-input').value = '';
+      renderTasks();
+      reschedule();
+    };
+    // 手动表单添加（标题/类别/分钟/优先级/DDL）
+    $('task-add').onclick = async () => {
+      const title = $('task-title').value.trim();
+      if (!title) return;
+      const minutes = parseInt($('task-min').value, 10) || 60;
+      await store.addTask({
+        title,
+        category: $('task-cat').value.trim() || '其他',
+        estimatedMinutes: minutes,
+        priority: parseInt($('task-pri').value, 10) || 3,
+        splittable: minutes >= 50,
+        minBlockMinutes: Math.min(25, minutes),
+        deadline: $('task-ddl').value || null,
+        source: 'manual', folderPath: null,
+        checklist: [{ id: ckId(), text: `完成「${title}」`, done: false, key: 'auto' }],
+      });
+      $('task-title').value = '';
       renderTasks();
       reschedule();
     };
@@ -754,6 +852,7 @@
       });
     }
     try { blocks = JSON.parse(LS.get('plan-pal.blocks') || '[]'); } catch (e) { blocks = []; }
+    collapseAllPanels(); // 极简模式：默认只显示计划列表
     fillParams();
     bind();
     renderTasks();

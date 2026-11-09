@@ -63,6 +63,25 @@ ${css}
   </div>
 </header>
 <main>
+  <nav id="panel-nav">
+    <button data-panel="panel-quick" class="nav-btn">⚡ 加计划</button>
+    <button data-panel="panel-events" class="nav-btn">📅 固定课表</button>
+    <button data-panel="panel-params" class="nav-btn">🎛️ 强度参数</button>
+    <button data-panel="panel-timeline" class="nav-btn">🕐 今日时间轴</button>
+    <span class="nav-hint">点击展开 / 收起板块 · 计划列表始终显示</span>
+  </nav>
+  <section class="panel wide" id="panel-tasks">
+    <h2>📝 计划列表</h2>
+    <div class="row form">
+      <input id="task-title" placeholder="标题">
+      <input id="task-cat" placeholder="类别" value="学习" style="max-width:90px">
+      <input id="task-min" type="number" placeholder="分钟" value="60" style="max-width:80px">
+      <input id="task-pri" type="number" min="1" max="5" value="3" style="max-width:60px" title="优先级1-5">
+      <input id="task-ddl" type="datetime-local" style="max-width:200px">
+      <button id="task-add">➕</button>
+    </div>
+    <ul id="task-list"></ul>
+  </section>
   <section class="panel" id="panel-quick">
     <h2>⚡ 加计划</h2>
     <div class="tabs" id="entry-tabs">
@@ -116,19 +135,7 @@ ${css}
       <p class="hint">当前为本地规则识别（站点/标题建议）；联网抓取网页标题将在 v0.2 接入 LLM 双路由。</p>
     </div>
   </section>
-  <section class="panel">
-    <h2>📝 计划列表</h2>
-    <div class="row form">
-      <input id="task-title" placeholder="标题">
-      <input id="task-cat" placeholder="类别" value="学习" style="max-width:90px">
-      <input id="task-min" type="number" placeholder="分钟" value="60" style="max-width:80px">
-      <input id="task-pri" type="number" min="1" max="5" value="3" style="max-width:60px" title="优先级1-5">
-      <input id="task-ddl" type="datetime-local" style="max-width:200px">
-      <button id="task-add">➕</button>
-    </div>
-    <ul id="task-list"></ul>
-  </section>
-  <section class="panel">
+  <section class="panel" id="panel-events">
     <h2>📅 固定安排（课表）</h2>
     <div class="row form">
       <input id="evt-title" placeholder="名称">
@@ -143,7 +150,7 @@ ${css}
     </div>
     <ul id="evt-list"></ul>
   </section>
-  <section class="panel">
+  <section class="panel" id="panel-params">
     <h2>🎛️ 强度参数</h2>
     <div class="grid params">
       <label>日负荷上限(分) <input id="p-load" type="number"></label>
@@ -160,7 +167,7 @@ ${css}
       </label>
     </div>
   </section>
-  <section class="panel wide">
+  <section class="panel wide" id="panel-timeline">
     <h2>🕐 今日时间轴 <span id="today-label"></span></h2>
     <div id="warnings"></div>
     <div id="timeline-wrap"><div id="timeline"></div></div>
