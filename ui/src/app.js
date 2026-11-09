@@ -904,6 +904,24 @@
       a.download = `plan-pal-${todayStr()}.json`;
       a.click();
     };
+    $('btn-import').onclick = () => $('import-file').click();
+    $('import-file').onchange = async () => {
+      const file = $('import-file').files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!confirm('导入备份会覆盖当前所有计划与课表，确定继续？')) return;
+        const r = await store.restoreAll(data);
+        showToast(`已恢复：${r.tasks} 条计划、${r.events} 条固定安排`);
+        renderTasks();
+        renderEvents();
+        fillParams();
+        reschedule();
+      } catch (e) {
+        showToast('导入失败：' + e.message);
+      }
+      $('import-file').value = '';
+    };
     $('btn-clear').onclick = () => {
       if (!confirm('确定清空本机所有数据？（不可恢复）')) return;
       LS.remove('plan-pal.log');

@@ -200,11 +200,13 @@ if (!window.__PLAN_PAL_COMPAT__) {
 </script>
 <div id="pet">🧑‍💻<div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.1.10 · 2026-11-09 08:31</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.1.11 · 2026-11-09 08:39</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
     <button id="btn-export">📤 导出数据</button>
+    <button id="btn-import">📥 导入备份</button>
+    <input id="import-file" type="file" accept=".json,application/json" hidden>
     <button id="btn-clear" class="danger">🗑️ 清空数据</button>
   </div>
 </header>
@@ -980,6 +982,29 @@ class PlanStore {
       intensity: this.intensity,
       executionLogs: [...this.executionLogs],
     });
+  }
+
+  /**
+   * 导入恢复：用备份 JSON（btn-export 导出的格式）整体替换当前状态。
+   * 全量替换语义；导入边界处清空撤销历史（不可跨导入撤销）。
+   * 校验宽松但必须有 tasks / fixedEvents 数组字段，否则抛错。
+   */
+  async restoreAll(data   
+                   
+                               
+                                        
+                                   
+   )                                             {
+    if (!Array.isArray(data.tasks) || !Array.isArray(data.fixedEvents)) {
+      throw new Error('备份文件格式不正确（缺少 tasks / fixedEvents）');
+    }
+    this.tasks = new Map(data.tasks.map((t) => [t.id, t]));
+    this.fixedEvents = new Map(data.fixedEvents.map((e) => [e.id, e]));
+    this.executionLogs = data.executionLogs || [];
+    this.intensity = data.intensity || null;
+    this.history.length = 0;
+    await this.saveSnapshot();
+    return { tasks: this.tasks.size, events: this.fixedEvents.size };
   }
 
   // ---- 任务 ----
@@ -2210,6 +2235,24 @@ window.Ics = { parseIcs };
       a.href = URL.createObjectURL(blob);
       a.download = `plan-pal-${todayStr()}.json`;
       a.click();
+    };
+    $('btn-import').onclick = () => $('import-file').click();
+    $('import-file').onchange = async () => {
+      const file = $('import-file').files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!confirm('导入备份会覆盖当前所有计划与课表，确定继续？')) return;
+        const r = await store.restoreAll(data);
+        showToast(`已恢复：${r.tasks} 条计划、${r.events} 条固定安排`);
+        renderTasks();
+        renderEvents();
+        fillParams();
+        reschedule();
+      } catch (e) {
+        showToast('导入失败：' + e.message);
+      }
+      $('import-file').value = '';
     };
     $('btn-clear').onclick = () => {
       if (!confirm('确定清空本机所有数据？（不可恢复）')) return;

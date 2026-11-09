@@ -218,6 +218,29 @@ export class PlanStore {
     });
   }
 
+  /**
+   * 导入恢复：用备份 JSON（btn-export 导出的格式）整体替换当前状态。
+   * 全量替换语义；导入边界处清空撤销历史（不可跨导入撤销）。
+   * 校验宽松但必须有 tasks / fixedEvents 数组字段，否则抛错。
+   */
+  async restoreAll(data: {
+    tasks?: Task[];
+    fixedEvents?: FixedEvent[];
+    intensity?: IntensityProfile | null;
+    executionLogs?: ExecutionLog[];
+  }): Promise<{ tasks: number; events: number }> {
+    if (!Array.isArray(data.tasks) || !Array.isArray(data.fixedEvents)) {
+      throw new Error('备份文件格式不正确（缺少 tasks / fixedEvents）');
+    }
+    this.tasks = new Map(data.tasks.map((t) => [t.id, t]));
+    this.fixedEvents = new Map(data.fixedEvents.map((e) => [e.id, e]));
+    this.executionLogs = data.executionLogs || [];
+    this.intensity = data.intensity || null;
+    this.history.length = 0;
+    await this.saveSnapshot();
+    return { tasks: this.tasks.size, events: this.fixedEvents.size };
+  }
+
   // ---- 任务 ----
 
   async addTask(input: Omit<Task, 'id' | 'status'>): Promise<Task> {

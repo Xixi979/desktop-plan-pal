@@ -43,7 +43,7 @@ const icsJs = toBrowserJs('core/src/ics.ts', 'Ics', [
 
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.1.10 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.1.11 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->
@@ -82,6 +82,8 @@ if (!window.__PLAN_PAL_COMPAT__) {
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
     <button id="btn-export">📤 导出数据</button>
+    <button id="btn-import">📥 导入备份</button>
+    <input id="import-file" type="file" accept=".json,application/json" hidden>
     <button id="btn-clear" class="danger">🗑️ 清空数据</button>
   </div>
 </header>

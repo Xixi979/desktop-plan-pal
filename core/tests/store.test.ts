@@ -152,3 +152,39 @@ describe('FileAdapter 文件落盘', () => {
     await fs.rm(baseDir, { recursive: true, force: true });
   });
 });
+
+describe('导入恢复（restoreAll）', () => {
+  it('备份 JSON 整体替换当前状态，格式非法抛错，撤销历史清空', async () => {
+    const store = new PlanStore(new MemoryAdapter(), 'dev-a');
+    await store.open();
+    await store.addTask(mkTaskInput());
+    await store.addFixedEvent({ title: '旧课', startTime: '08:00', endTime: '09:00', rrule: 'FREQ=DAILY', effectiveFrom: DATE });
+    expect(store.listTasks()).toHaveLength(1);
+
+    // 非法格式 → 抛错
+    let threw = false;
+    try { await store.restoreAll({} as never); } catch (e) { threw = true; }
+    expect(threw).toBe(true);
+
+    // 合法备份（导出格式）→ 整体替换
+    const backup = {
+      tasks: [{ ...mkTaskInput(), id: 'task-x', status: 'scheduled', checklist: [] }],
+      fixedEvents: [{ id: 'ev-x', title: '新课', startTime: '10:00', endTime: '11:00', rrule: 'FREQ=DAILY', effectiveFrom: DATE }],
+      intensity: PROFILE,
+      executionLogs: [],
+    };
+    const r = await store.restoreAll(backup);
+    expect(r.tasks).toBe(1);
+    expect(r.events).toBe(1);
+    expect(store.listTasks()[0].id).toBe('task-x');
+    expect(store.listFixedEvents()[0].title).toBe('新课');
+    expect(store.getIntensity()).toBeTruthy();
+
+    // 快照已落：新实例 open 后即为导入状态
+    const adapter = (store as unknown as { adapter: MemoryAdapter }).adapter;
+    const storeB = new PlanStore(adapter, 'dev-a');
+    await storeB.open();
+    expect(storeB.listTasks()).toHaveLength(1);
+    expect(storeB.listTasks()[0].id).toBe('task-x');
+  });
+});
