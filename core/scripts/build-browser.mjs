@@ -43,7 +43,7 @@ const icsJs = toBrowserJs('core/src/ics.ts', 'Ics', [
 
 const appJs = read('ui/src/app.js');
 const css = read('ui/src/style.css');
-const BUILD_TAG = `v0.1.9 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
+const BUILD_TAG = `v0.1.10 · ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`;
 
 const html = `<!DOCTYPE html>
 <!-- 本文件由 core/scripts/build-browser.mjs 自动生成，请勿手改；修改 ui/src/ 下源码后重新构建 -->

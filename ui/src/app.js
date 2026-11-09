@@ -21,6 +21,20 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
     }[c]));
   }
+  /** 轻提示（Toast）：替代静默 return，操作无效果时必须给用户反馈 */
+  let toastTimer = null;
+  function showToast(msg) {
+    let el = document.getElementById('pp-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pp-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+  }
 
   // ---- 浏览器存储适配器（与 core 的 StorageAdapter 接口一致；经 LS 安全读写）----
   class LocalStorageAdapter {
@@ -699,6 +713,7 @@
     // 通道一：一句话（同名计划自动并入并完善达标要求）
     $('quick-add').onclick = async () => {
       const raw = $('quick-input').value;
+      if (!raw.trim()) { showToast('请先输入计划内容，如：写实验报告 3小时 周五前'); $('quick-input').focus(); return; }
       const parsed = parseQuick(raw);
       const target = store.listTasks().find((t) =>
         t.status !== 'done' && t.status !== 'cancelled' && normTitle(t.title) === normTitle(parsed.title));
@@ -718,8 +733,9 @@
     // 手动表单添加（标题/类别/分钟/优先级/DDL）
     $('task-add').onclick = async () => {
       const title = $('task-title').value.trim();
-      if (!title) return;
+      if (!title) { showToast('请先填写计划名称'); $('task-title').focus(); return; }
       const minutes = parseInt($('task-min').value, 10) || 60;
+      if (!(minutes > 0)) { showToast('预计分钟需为正整数'); $('task-min').focus(); return; }
       await store.addTask({
         title,
         category: $('task-cat').value.trim() || '其他',
@@ -822,7 +838,7 @@
     };
     $('evt-add').onclick = async () => {
       const title = $('evt-title').value.trim();
-      if (!title) return;
+      if (!title) { showToast('请先填写安排名称，如：高数课'); $('evt-title').focus(); return; }
       await store.addFixedEvent({
         title,
         startTime: $('evt-start').value || '08:00',
