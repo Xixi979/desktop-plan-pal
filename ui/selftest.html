@@ -259,7 +259,7 @@ if (!window.__PLAN_PAL_COMPAT__) {
 </script>
 <div id="pet"><div id="pet-bubble">加载中…</div></div>
 <header>
-  <h1>桌面计划小人 <span class="ver">v0.2.5 · 2026-11-09 12:12</span></h1>
+  <h1>桌面计划小人 <span class="ver">v0.2.5.1 · 2026-11-09 12:19</span></h1>
   <div class="header-actions">
     <button id="btn-reschedule">🔄 重新排程</button>
     <button id="btn-undo">↩️ 撤销</button>
@@ -1780,10 +1780,18 @@ function periodsToTime(a        , b        )                                    
 function parseTimetableLine(line        )                 {
   let t = line.replace(/\s+/g, ' ').trim();
   if (t.length < 3) return null;
+  // OCR 常见误认：「节」→「贡/贝」等（仅限紧跟数字后的上下文）
+  t = t.replace(/(\d)\s*[贡貝贝](?![\u4e00-\u9fff])/g, '$1节');
+  // 中文之间的空格（OCR 分词噪声）：逐对折叠
+  let prev = '';
+  while (prev !== t) {
+    prev = t;
+    t = t.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2');
+  }
 
-  // 1) 星期（可多个：周一、周三）
+  // 1) 星期（可多个：周一、周三；容忍「周 五」式空格）
   const days           = [];
-  const dayRe = /(?:周|星期)([一二三四五六日天])/g;
+  const dayRe = /(?:周|星期)\s*([一二三四五六日天])/g;
   let dm                        ;
   while ((dm = dayRe.exec(t)) !== null) {
     const code = BYDAY_BY_DAY[dm[1]];
@@ -3065,8 +3073,8 @@ window.Timetable = { parseTimetableLine, parseTimetableLines };
           $('ics-result').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时）——可改用「📥 导入ICS」或手动添加';
           return;
         }
-        const dataUrl = await compressImage(file, 1400, 0.8);
-        const r = await T.recognize(dataUrl, 'chi_sim+eng');
+        const ocr = await compressImage(file, 1400, 0.8);
+        const r = await T.recognize(ocr.ocrUrl || ocr.dataUrl, 'chi_sim+eng');
         const lines = (r.data.text || '').split(/\n+/)
           .map((s) => s.replace(/\s+/g, ' ').trim())
           .filter((s) => s.length >= 3);
@@ -3096,7 +3104,7 @@ window.Timetable = { parseTimetableLine, parseTimetableLines };
         renderEvents();
         reschedule();
       } catch (e) {
-        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || '未知错误');
+        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || String(e) || '未知错误');
       }
       $('evt-img-file').value = '';
     };

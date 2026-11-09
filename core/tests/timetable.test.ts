@@ -50,6 +50,19 @@ describe('parseTimetableLine 单行解析', () => {
     expect(parseTimetableLine('ab')).toBeNull();
     expect(parseTimetableLine('')).toBeNull();
   });
+
+  it('OCR 噪声：字间空格、节误认为贡（真实 Tesseract 输出形态）', () => {
+    const d1 = parseTimetableLine('高 等 数学 周一 08:00-09:40');
+    expect(d1!.title).toBe('高等数学');
+    expect(d1!.rrule).toBe('FREQ=WEEKLY;BYDAY=MO');
+    const d2 = parseTimetableLine('大 学 英语 星期 三 第 3-4 贡');
+    expect(d2!.title).toBe('大学英语');
+    expect(d2!.startTime).toBe(PERIOD_STARTS[2]);
+    expect(d2!.rrule).toContain('WE');
+    const d3 = parseTimetableLine('体育 周 五 14:00-15:40');
+    expect(d3!.title).toBe('体育');
+    expect(d3!.rrule).toBe('FREQ=WEEKLY;BYDAY=FR');
+  });
 });
 
 describe('parseTimetableLines 批量解析', () => {

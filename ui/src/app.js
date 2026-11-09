@@ -1114,8 +1114,8 @@
           $('ics-result').textContent = '⚠️ 文字识别引擎不可用（无网络或加载超时）——可改用「📥 导入ICS」或手动添加';
           return;
         }
-        const dataUrl = await compressImage(file, 1400, 0.8);
-        const r = await T.recognize(dataUrl, 'chi_sim+eng');
+        const ocr = await compressImage(file, 1400, 0.8);
+        const r = await T.recognize(ocr.ocrUrl || ocr.dataUrl, 'chi_sim+eng');
         const lines = (r.data.text || '').split(/\n+/)
           .map((s) => s.replace(/\s+/g, ' ').trim())
           .filter((s) => s.length >= 3);
@@ -1145,7 +1145,7 @@
         renderEvents();
         reschedule();
       } catch (e) {
-        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || '未知错误');
+        $('ics-result').textContent = '✗ 课表识别失败：' + (e.message || String(e) || '未知错误');
       }
       $('evt-img-file').value = '';
     };

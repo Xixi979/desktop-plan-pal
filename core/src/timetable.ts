@@ -47,10 +47,18 @@ function periodsToTime(a: number, b: number): { start: string; end: string } | n
 export function parseTimetableLine(line: string): TtDraft | null {
   let t = line.replace(/\s+/g, ' ').trim();
   if (t.length < 3) return null;
+  // OCR 常见误认：「节」→「贡/贝」等（仅限紧跟数字后的上下文）
+  t = t.replace(/(\d)\s*[贡貝贝](?![\u4e00-\u9fff])/g, '$1节');
+  // 中文之间的空格（OCR 分词噪声）：逐对折叠
+  let prev = '';
+  while (prev !== t) {
+    prev = t;
+    t = t.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, '$1$2');
+  }
 
-  // 1) 星期（可多个：周一、周三）
+  // 1) 星期（可多个：周一、周三；容忍「周 五」式空格）
   const days: string[] = [];
-  const dayRe = /(?:周|星期)([一二三四五六日天])/g;
+  const dayRe = /(?:周|星期)\s*([一二三四五六日天])/g;
   let dm: RegExpExecArray | null;
   while ((dm = dayRe.exec(t)) !== null) {
     const code = BYDAY_BY_DAY[dm[1]];
