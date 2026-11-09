@@ -7,8 +7,37 @@
  */
 const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
+
+/**
+ * 数据迁移：--import <json 文件>
+ * 把 Edge 版导出的 plan-pal.* 键值 JSON 写入本壳 localStorage（首次 loadFile 建 origin）。
+ * 生成方式：Edge 打开 ui/dump-tmp.html 导出，或手动「📦 导出备份」后再转格式。
+ */
+async function importData(jsonPath) {
+  const raw = fs.readFileSync(jsonPath, 'utf8');
+  const data = JSON.parse(raw);
+  const w = new BrowserWindow({
+    show: false,
+    webPreferences: { sandbox: true },
+  });
+  await w.loadFile(path.join(UI_DIR, 'index.html'));
+  const sets = Object.keys(data)
+    .map((k) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(data[k])});`)
+    .join('\n');
+  const verify = `
+    ${sets}
+    (${Object.keys(data).map((k) => `localStorage.getItem(${JSON.stringify(k)})`).join(' + ')});
+  `;
+  const check = await w.webContents.executeJavaScript(verify, false);
+  const expected = Object.keys(data).map((k) => data[k]).join('');
+  console.log(check === expected
+    ? `IMPORT_OK keys=${Object.keys(data).length}`
+    : `IMPORT_MISMATCH expected=${expected.length} got=${check ? check.length : 'null'}`);
+  app.quit();
+}
 
 function createMainWindow() {
   const w = new BrowserWindow({
@@ -52,6 +81,16 @@ function createPetWindow() {
 }
 
 app.whenReady().then(() => {
+  // 数据迁移模式：--import <json> → 写入 localStorage 后退出
+  const importIdx = process.argv.indexOf('--import');
+  if (importIdx !== -1 && process.argv[importIdx + 1]) {
+    importData(process.argv[importIdx + 1]).catch((e) => {
+      console.error('IMPORT_FAIL', e.message);
+      app.quit();
+    });
+    return;
+  }
+
   // 命令行带 --main 时直接开主页面（桌面小人-主页.bat 用）
   if (process.argv.includes('--main')) {
     createMainWindow();

@@ -273,14 +273,15 @@ html, body {
 }
 /* Electron 透明壳：背景全透明，只剩小人与气泡浮在桌面上 */
 html.in-electron, body.in-electron { background: transparent !important; border-radius: 0; }
+/* 关闭按钮：挂在小人右上角，鼠标悬停到小人上才浮现 */
 .pet-win-close {
-  display: none; position: fixed; top: 8px; right: 10px; z-index: 100;
+  display: none; position: absolute; top: -6px; right: -6px; z-index: 100;
   width: 22px; height: 22px; border: none; border-radius: 50%;
-  background: rgba(255,255,255,.18); color: rgba(255,255,255,.85);
+  background: rgba(30,36,64,.55); color: #fff;
   font-size: 12px; line-height: 22px; text-align: center; cursor: pointer;
 }
-body.in-electron .pet-win-close { display: block; }
-.pet-win-close:hover { background: rgba(255,255,255,.35); color: #fff; }
+#pet:hover .pet-win-close { display: block; }
+.pet-win-close:hover { background: #e5484d; color: #fff; }
 #pet {
   position: fixed; left: calc(50% - 75px); right: auto; bottom: 18px;
   width: 150px; height: 150px;

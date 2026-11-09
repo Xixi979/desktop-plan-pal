@@ -128,7 +128,7 @@
     });
   }
 
-  /** Electron 壳适配：透明背景 + 整窗拖动 + 右上角关闭按钮 */
+  /** Electron 壳适配：透明背景 + 整窗拖动 + 小人右上角悬停关闭按钮 */
   function setupElectron() {
     var isElectron = /Electron/i.test(navigator.userAgent);
     if (!isElectron) return;
@@ -146,7 +146,8 @@
     closeBtn.addEventListener('click', function () {
       try { window.close(); } catch (e) { /* 忽略 */ }
     });
-    document.body.appendChild(closeBtn);
+    // 挂在小人容器内：贴着小人右上角，悬停到小人上才显示
+    if (pet) pet.appendChild(closeBtn);
   }
 
   function boot() {

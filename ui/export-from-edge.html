@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>计划数据迁移 · Edge → Electron</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #1f2937; line-height: 1.7; }
+  h1 { font-size: 20px; } ol { padding-left: 22px; } code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  button { background: #4f6ef7; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  button:hover { background: #3d5ae0; }
+  pre { background: #f8f9fb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; max-height: 200px; overflow: auto; font-size: 12px; }
+  .ok { color: #059669; font-weight: bold; } .empty { color: #b45309; }
+</style>
+</head>
+<body>
+<h1>📦 Edge 版数据导出（迁移到透明桌宠用）</h1>
+<ol>
+  <li>确认你正在 <b>Edge 浏览器</b>里打开本页（且曾用 Edge 打开过计划页面）</li>
+  <li>点下面的按钮，把 <code>plan-pal-数据.json</code> 下载保存</li>
+  <li>告诉我文件保存好了，我用 <code>--import</code> 命令把它注入透明桌宠（Electron 壳）</li>
+</ol>
+<p><button id="dl">⬇️ 导出我的计划数据</button> <span id="stat"></span></p>
+<pre id="out">（导出后数据预览显示在这里）</pre>
+<script>
+(function () {
+  var KEYS = ['plan-pal.blocks', 'plan-pal.snap', 'plan-pal.log', 'plan-pal.llm', 'plan-pal.intensity'];
+  var btn = document.getElementById('dl');
+  var stat = document.getElementById('stat');
+  var out = document.getElementById('out');
+  btn.addEventListener('click', function () {
+    var data = {};
+    for (var i = 0; i < KEYS.length; i++) {
+      try { var v = localStorage.getItem(KEYS[i]); if (v != null) data[KEYS[i]] = v; } catch (e) {}
+    }
+    var n = Object.keys(data).length;
+    if (n === 0) {
+      stat.innerHTML = '<span class="empty">本页读不到数据：请改用 Edge 打开本页，或先打开一次 Edge 版计划页再回来导出</span>';
+      return;
+    }
+    stat.innerHTML = '<span class="ok">✓ 已导出 ' + n + ' 项，已开始下载</span>';
+    out.textContent = JSON.stringify(data, null, 2).slice(0, 2000);
+    var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'plan-pal-数据.json';
+    a.click();
+  });
+})();
+</script>
+</body>
+</html>
