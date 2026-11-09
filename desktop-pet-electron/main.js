@@ -19,6 +19,11 @@ ipcMain.on('pet-move', (event, dx, dy) => {
   win.setPosition(x + Math.round(dx), y + Math.round(dy));
 });
 
+// 双击小人 → 主进程直接创建主页面窗口（不经 window.open，行为可控可关闭）
+ipcMain.on('open-main', () => {
+  createMainWindow();
+});
+
 /**
  * 数据迁移：--import <json 文件>
  * 把 Edge 版导出的 plan-pal.* 键值 JSON 写入本壳 localStorage（首次 loadFile 建 origin）。
@@ -78,13 +83,8 @@ function createPetWindow() {
   pet.setAlwaysOnTop(true, 'screen-saver');
   pet.loadFile(path.join(UI_DIR, 'pet.html'));
 
-  // 桌宠页里的链接（点小人开主页面）：拦截为同壳内新窗口（同 session → 同 localStorage）
-  pet.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.includes('index.html')) {
-      createMainWindow();
-    }
-    return { action: 'deny' };
-  });
+  // 一律拦截网页发起的开窗（统一走 IPC 'open-main'），杜绝 window.open 的怪异行为
+  pet.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   return pet;
 }
 

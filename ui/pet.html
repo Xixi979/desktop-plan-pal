@@ -500,9 +500,13 @@ html.in-electron, body.in-electron { background: transparent !important; border-
         dragging = false;
         pet.style.cursor = 'grab';
       });
-      // 双击打开主页面（单击不再打开）
+      // 双击打开主页面（IPC 通知主进程创建，可靠关闭；非 Electron 环境降级 window.open）
       pet.addEventListener('dblclick', function () {
-        try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
+        if (window.PetNative && window.PetNative.openMain) {
+          window.PetNative.openMain();
+        } else {
+          try { window.open('index.html', '_blank'); } catch (e) { /* 忽略 */ }
+        }
       });
     } else {
       // 非 Electron（Edge app 模式）：保留单击打开

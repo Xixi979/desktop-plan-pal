@@ -7,4 +7,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('PetNative', {
   /** 按增量移动桌宠窗口（拖拽用） */
   moveBy: (dx, dy) => ipcRenderer.send('pet-move', dx, dy),
+  /** 双击小人 → 请求主进程打开主计划页 */
+  openMain: () => ipcRenderer.send('open-main'),
 });
